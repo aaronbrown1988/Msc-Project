@@ -1,0 +1,7 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1,pvmem=200mb,walltime=48:00:00
+#PBS -V
+cd $PBS_O_WORKDIR
+./jar_sweep 12 2 25 25 50 1 0.2 2
+
+

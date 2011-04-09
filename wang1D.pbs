@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1,mem=400mb,walltime=24:00:00
+#PBS -V
+#PBS -N WL-sqr-bigtest
+#PBS -M A.H.Brown@warwick.ac.uk
+#pbs -m abe
+echo "kb = 1, L=50" 1>&2
+cd $PBS_O_WORKDIR
+time ./wang1D 
+
+
+

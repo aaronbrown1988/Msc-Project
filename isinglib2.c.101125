@@ -1,0 +1,871 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <unistd.h>
+#include "./isinglib2.h"
+
+
+
+/********************************************************************
+ * Ising library, containing all methods required to setup and run the
+ *  simulation using different methods and lattices
+ * 
+ *  NOT CHECKED FOR THREAD SAFETY
+ ********************************************************************/
+
+
+
+#define DEBUG 0
+
+
+const double  j_1 = -1; // in plane Anti-ferromagentic Coupling
+const double  j_2 = -1; // z -direction Anti-Ferromagnetic coupling
+double kb = 1e-23;
+//double kb = 1;
+
+double * run_model(double temperature, double field, double * coupl, long int flips, long int steps,  int blocks, int n,int type,  int dim, int method) {
+	double ratio;
+	int i,j;
+	double block_avg[3];
+	double order;
+	double * results;
+	coupling = coupl;
+	results = malloc(6*sizeof(double));
+	spintype *s;
+	
+	s = setup(type,n,dim);
+
+	for(i = 0; i < 6; i ++) 
+			results[i] = 0;
+	/* equilibration */
+	 //	switch (method) {
+		//	case 1: 
+		//		metropolis(s, n, dim, flips, temperature*10, &ratio, field);
+				metropolis(s, n, dim, flips, temperature, &ratio, field);
+		//		break;
+		//	case 2:
+		//		wolff(s, n, dim, flips, temperature, &ratio, field);
+		//		break;
+		//} 
+			
+
+		
+	for (i = 0; i < blocks; i++) {
+		block_avg[0] = 0;
+		block_avg[1] = 0;
+		block_avg[2] = 0;
+	
+		
+		
+		for(j = 0; j < steps; j++) {
+			
+			switch (method) {
+			case 1:
+				metropolis(s, n, dim, flips, temperature, &ratio, field);
+				break;
+			case 2:
+				wolff(s, n,dim, flips, temperature, &ratio, field);
+				break;
+			}
+			
+			order =  abs(sumover(s,n, dim))/pow(n,dim);
+			block_avg[0] += ratio;
+			block_avg[1] += energy_calc(s,n, dim, field);
+			block_avg[2] += order;
+		}
+		block_avg[0] /= (double) steps;
+		block_avg[1] /= (double) steps;
+		block_avg[2] /= (double) steps;
+		
+		
+		results[0] += block_avg[0];  //ratio
+		results[2] += block_avg[1]; //energy
+		results[4] += block_avg[2]; //order 
+		
+		results[1] += block_avg[0] *block_avg[0];
+		results[3] += block_avg[1] *block_avg[1];
+		results[5] += block_avg[2] *block_avg[2];
+	}
+	//printf("Run Averages:\n");
+	results[0] /= (double) blocks;
+	results[2] /= (double) blocks;
+	results[4] /= (double) blocks;
+	
+	
+	// Normalize fluctuations
+	results[1] /= (double) blocks; // this quantity makes no sense
+	results[3] /= (double) blocks;
+	results[5] /= (double) blocks;
+	
+	results[1] -= results[0]*results[0]; // This Quantity Makes no sense.....
+	results[3] -= results[2]*results[2];
+	results[5] -= results[4]*results[4];
+	
+	results[1] = (results[1] > 0) ? sqrt(results[1]/ (double) blocks) : results[1];//sqrt(-results[1]/ (double) blocks);
+	results[3] = (results[3] > 0) ? sqrt(results[3]/ (double) blocks) : results[3];//sqrt(-results[3]/ (double) blocks);
+	results[5] = (results[5] > 0) ? sqrt(results[5]/ (double) blocks) : results[5];//sqrt(-results[5]/ (double) blocks);
+	
+	
+	
+	//printf("%3.2lf\t%3.4lf\t%3.4lf\t%3.4lf\t%3.4lf\t%3.4lf\t%3.4lf\n", temperature, results[0], results[1], results[2], results[3], results[4], results[5]);
+	//printf("Cleaning up\n");
+	cleanup(s,n,dim);
+	
+
+	return(results);
+}
+
+
+spintype * setup(int type, int n, int dim) {
+	spintype *s;
+	s = malloc(pow(n,dim)*sizeof(spintype));
+	if (s ==NULL) {
+		printf("Couldn;t allocate memory\n");
+		exit(EXIT_FAILURE);
+	}
+	if (type == 1) {
+		setupSqrSystem(s,n, dim);	
+	} else {
+		setupTriSystem(s,n,dim);
+	}
+	initSpins(s,n,dim);
+	return(s);
+}
+
+void cleanup(spintype * s, int n, int dim) {
+	int i;
+	for (i = 0; i < pow(n,dim); i ++) {
+		free(s[i].neigh_couple);
+		free(s[i].neighbours);
+	}
+	free(s);
+}
+
+
+double sumover(spintype *s, int n, int dim) {
+	int i;
+	double result;
+	result = 0;
+	for (i = 0; i < pow(n,dim); i++) {
+		result += (double) s[i].s;
+	}
+	return result;
+}
+
+void setupSqrSystem(spintype *s, int n, int dim) { 
+	int i,j,k;
+	int curr_spin;
+	for (i = 0; i < n; i ++) {
+		for(j = 0; j < n; j++) {
+			for (k = 0; k < n; k++ ) {
+				if ( dim <= 2)
+					k = 0;
+				curr_spin = ai(i,j,k,n);	
+				s[curr_spin].n_neigh = 2*dim;
+				s[curr_spin].neighbours = malloc(sizeof(int)*s[curr_spin].n_neigh);
+				s[curr_spin].neigh_couple = malloc(sizeof(int)*2*dim);
+				s[curr_spin].neighbours[0] = (i < (n-1)) ? ai(i+1,j,k,n) : ai(0,j,k,n);
+				s[curr_spin].neighbours[1] = ( i == 0) ? ai(n-1,j,k,n) : ai(i-1,j,k,n);
+				s[curr_spin].neigh_couple[0] = 0;
+				s[curr_spin].neigh_couple[1] = 0;
+				if(dim >= 2) {
+					s[curr_spin].neighbours[2] = (j < (n-1)) ? ai(i,j+1,k,n) : ai(i,0,k,n);
+					s[curr_spin].neighbours[3] = (j == 0) ? ai(i,n-1,k,n) : ai(i,j-1,k,n);
+					s[curr_spin].neigh_couple[2] = 1;
+					s[curr_spin].neigh_couple[3] = 1;
+					
+				}
+				if(dim >= 3) {
+					s[curr_spin].neighbours[4] = (k < (n-1)) ? ai(i,j,k+1,n) : ai(i,j,0,n);
+					s[curr_spin].neighbours[5] = (k == 0) ? ai(i,j,n-1,n): ai(i,j,k-1,n);
+					s[curr_spin].neigh_couple[4] = 2;
+					s[curr_spin].neigh_couple[5] = 2;
+				
+				}
+				if (dim <= 2)
+					k = n;
+			}
+		}
+	}
+	
+}
+
+
+void setupTriSystem(spintype *s, int n, int dim) { 
+	int i,j,k;
+	int curr_spin;
+	if (dim < 2) {
+		printf("Invalid Dimension for Triangular lattice... defaulting to square\n");
+		setupSqrSystem(s,n,dim);
+		return;
+	}
+	for (i = 0; i < n; i ++) {
+		for(j = 0; j < n; j++) {
+			for (k = 0; k < n; k++ ) {
+				if ( dim == 2)
+					k = 0;
+				curr_spin = ai(i,j,k,n);
+				/* Initialise Arrays containing Neighbours and coupling info*/
+				s[curr_spin].n_neigh = 2*dim + 2;
+				s[curr_spin].neighbours = malloc(sizeof(int)*s[curr_spin].n_neigh);
+				s[curr_spin].neigh_couple = malloc(sizeof(int)*(2*dim + 2));
+				/*Neighbours on a line*/
+				s[curr_spin].neighbours[0] = (i < (n-1)) ? ai(i+1,j,k,n) : ai(0,j,k,n);
+				s[curr_spin].neighbours[1] = ( i == 0) ? ai(n-1,j,k,n) : ai(i-1,j,k,n);
+				s[curr_spin].neigh_couple[0] = 0;
+				s[curr_spin].neigh_couple[1] = 0;
+				if(dim >= 2) {
+					/* neighbours in a plane */
+					s[curr_spin].neighbours[2] = (j < (n-1)) ? ai(i,j+1,k,n) : ai(i,0,k,n);
+					s[curr_spin].neighbours[3] = (j == 0) ? ai(i,n-1,k,n) : ai(i,j-1,k,n);
+					s[curr_spin].neigh_couple[2] = 1;
+					s[curr_spin].neigh_couple[3] = 1;
+					/*Diagonal Neighbours*/
+					s[curr_spin].neighbours[4] = (i<(n-1) && j<(n-1)) ? ai(i+1,j+1,k,n) : ai(0,0,k,n);
+					s[curr_spin].neighbours[4] = (i>=(n-1) && j<(n-1)) ? ai(0,j+1,k,n) : s[curr_spin].neighbours[4];
+					s[curr_spin].neighbours[4] = (i<(n-1) && j >=(n-1)) ? ai(i+1,0,k,n) :s[curr_spin].neighbours[4]; 
+					s[curr_spin].neighbours[5] = (j == 0 && i == 0) ? ai(n-1,n-1,k,n) : ai(i-1,j-1,k,n);
+					s[curr_spin].neighbours[5] = (j != 0 && i == 0) ? ai(n-1,j-1,k,n) : s[curr_spin].neighbours[5];
+					s[curr_spin].neighbours[5] = (j == 0 && i != 0) ? ai(i-1,n-1,k,n) : s[curr_spin].neighbours[5];
+					s[curr_spin].neigh_couple[4] = 2;
+					s[curr_spin].neigh_couple[5] = 2;
+					
+				}
+				
+				
+				if(dim >= 3) {
+					/* Links between Planes */
+					s[curr_spin].neighbours[6] = (k < (n-1)) ? ai(i,j,k+1,n) : ai(i,j,0,n);
+					s[curr_spin].neighbours[7] = (k == 0) ? ai(i,j,n-1,n): ai(i,j,k-1,n);
+					s[curr_spin].neigh_couple[6] = 3;
+					s[curr_spin].neigh_couple[7] = 3;
+				
+				}
+				if (dim <= 2)
+					k = n;
+			}
+		}
+	}
+	
+}
+
+
+
+
+int ai(int i, int j, int k, int n) {
+	return (i + j*n + n*n*k);
+}
+
+
+
+
+void initSpins(spintype *s, int n, int dim) {
+	int r;
+	int i,j;
+	j = pow(n,dim);
+	for (i = 0; i < j; i++) {
+		r = rand();
+		s[i].s = 0;
+		s[i].s = (r <= RAND_MAX/2)? 1:-1;
+		if (s[i].s == 0) {
+			printf("Error: rand gave: %d\n",r);
+			exit(1);
+		}
+	}
+//	printf("Spins are good\n");
+
+	/* trivial check to make sure all spins initialized*/
+	for(i = 0; i< j; i ++) {
+		if (s[i].s == 0 ) {
+			printf("Error: Initalisation failed.\n");
+			printf("Error: Spin %d == 0\n", i);
+			exit(1);
+		}
+	}
+}
+
+void metropolis(spintype *s, int n, int dim, long int flips, double temperature, double * ratio, double field) {
+	int i,j,k;
+	int old_s;
+	double old_energy;
+	double new_energy;
+	int tries=0;
+	double test;
+	j = pow(n, dim);
+	spintype *cs;
+	*ratio = 0;
+	flips = j*flips; // 10 flips pre spin
+
+	for( *ratio = 0; *ratio < flips; tries++) {
+		
+		//Chose a random spin
+		i = round((double)rand()/RAND_MAX * (j-1));
+		k = i;
+		
+		cs = &s[i];
+		
+		//calulcate both the new and the old energy
+		old_s = s[i].s;
+		//old_energy = cs->s;
+		old_energy =  -field*s[i].s;
+		for (i=0; i < cs->n_neigh; i++) {
+			old_energy += coupling[cs->neigh_couple[i]]* s[cs->neighbours[i]].s;
+		}
+		old_energy *= cs->s;
+		
+		//flip spin
+		cs->s = -cs->s;
+		
+		new_energy =  -field*s[i].s;
+		for (i=0; i< cs->n_neigh; i++) {
+			new_energy += coupling[cs->neigh_couple[i]]*s[cs->neighbours[i]].s;
+		}
+		new_energy *= cs->s;
+	
+		test = (double) rand()/RAND_MAX;
+		//decide if the flip will be accepted.
+		if (test < exp(-(new_energy -old_energy)/temperature)) {
+			//move accepted
+			*ratio = *ratio + 1;
+		//	printf("DEBUG FLIP ACCEPTED");
+		} else {
+			cs->s = old_s;
+		}
+			
+			
+	}
+	cs = NULL;
+	*ratio = (*ratio)/tries;
+}
+
+/* Wolff Cluster Updating Method */
+void wolff(spintype *s, int n, int dim, long int flips, double temperature, double * ratio, double field) {
+	
+	
+	int i,j,l,m,x;
+	int clust_n;
+	short int exist;
+	double r, prob;
+	int clust[n*n*n];
+	double mag;
+	int tries=0;
+	*ratio = 0;
+	flips *= pow(n,dim);
+	for (l = 0; *ratio < flips; l++) {
+		//*clust = malloc(4*sizeof(spintype*));
+		
+		i = round((double)rand()/RAND_MAX *pow(n,dim));
+		clust_n = 1;
+		DEBUGLINE printf("Centering cluster round %d\n", i);
+		clust[0] = i;
+		m = 0;
+		for ( m = 0; m < clust_n ; m++) {
+			for (i = 0; ((i < s[clust[m]].n_neigh) && (clust_n < (n*n*n - 1))); i++) {
+				tries ++;
+				r = (double)rand()/RAND_MAX;
+				//calulate co-ordinates of neighbour
+				x = s[clust[m]].neighbours[i];
+				// see if it is already in the cluster
+				exist = 0;
+				prob = 1.0 - exp(2*coupling[s[m].neigh_couple[i]]/(kb*temperature)); 
+				for (j = 0; j < clust_n; j++ ) {
+					if (clust[j] == x ) {
+						exist = 1;
+				//		DEBUGLINE	printf("Found spin in cluster already\n");
+						break;
+					}
+				}
+				
+				if ((r < prob)) {
+					// Check if spins are parallel
+					if ((exist == 0) && (s[m].s == s[x].s)) {
+						*ratio = *ratio +1;
+						clust[clust_n] = x;
+						clust_n++;
+				//		DEBUGLINE printf("Added spin: (%d)\n", x);
+					}
+				} else {
+					DEBUGLINE printf("prob: %lf r:%lf\n", prob,r);
+				}
+			}
+		}
+		
+		mag = field * clust_n * s[clust[0]].s;	
+		if (mag >0  && mag != 0) {
+			// Flip spins
+			DEBUGLINE	printf("Cluster_size: %d\n consists of:\n", clust_n);
+			for(i =0; i < clust_n; i++) {
+				DEBUGLINE printf("%d\n", clust[i]);
+				s[clust[i]].s *= -1;
+			}
+		}
+	}
+	*ratio = *ratio/tries;
+}
+
+/**********
+double partition(double  *g_e, int n_bins, double bin_size, double start_energy, double T) {
+	int i;
+	double result;
+	result =0;
+	for (i = 0; i < n_bins; i ++) 
+		result += g_e[i] * exp((start_energy+i*bin_size)/T);
+	if (isinf(result)) {
+		printf("Z=inf\n");
+		exit(1);
+	}
+	if(isnan(result)) {
+		printf("Z is nan\n");
+		exit(1);
+	}
+	return(result);
+}
+*/
+
+
+
+double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
+	double bin_size =1; 
+	int n_bins;
+	int site, j,i;
+	long long int steps =0;
+	double E;
+	double eta,r;
+	int gE1, gE2;
+	double end_energy;
+	double start_energy;
+	int flat=0;
+	double avg;
+	double * g_e;
+	int *visit;
+	double f;
+	int n_avg;
+	double threshold;
+	double ge_min = 1000;
+	int old_site = n*n*n*n*n;
+	//double norm=0;
+	double start_mag, end_mag;
+	double mag_step;
+	int m1, m2;
+	int v_min;
+	
+	
+	start_energy = -(s[0].n_neigh/2)*pow(n,dim);
+	end_energy = (s[0].n_neigh/2)*pow(n,dim);
+	
+	start_mag = -pow(n,dim);
+	end_mag = pow(n,dim);
+	
+	
+	
+	n_bins = abs((end_energy - start_energy)/bin_size + 0.5);
+	mag_step = (end_mag - start_mag)/n_bins;
+	
+	*n_bin = n_bins;
+	
+	g_e = malloc(sizeof(double)*n_bins*n_bins);
+	visit = malloc(sizeof(int)*n_bins*n_bins);
+	
+	if (g_e == NULL || visit == NULL ) {
+		printf("Couldn't get memory for histograms\n");
+		exit(1);
+	}
+	
+	for (i = 0; i < n_bins*n_bins; i++) {
+		//Initialise Bins
+		g_e[i] = 0.0;
+		visit[i] = 0;
+	}
+	
+	f = 1;
+	threshold = 1e-2;
+	E = energy_calc(s, n, dim, field) * pow(n,dim);
+	gE1 = E - start_energy;
+	gE1 /= bin_size;
+	gE1 = round(gE1);
+	m1 = round((sumover(s,n,dim) - start_mag)/mag_step);
+	while (f > threshold) {
+		//Find G(E1)
+		
+		site = round((double)(pow(n,dim) * (double) rand())/RAND_MAX);
+		if (site == old_site) {
+			//printf("Got site %d again\n", site);
+			continue;
+		}
+		old_site = site;
+		
+		
+		
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE1, start_energy+(gE1*bin_size), start_energy+((gE1+1)*bin_size));
+		// Flip spin and get G(E2)
+		s[site].s = -s[site].s;
+		E = energy_calc(s, n, dim, field)* pow(n,dim);
+		gE2 = E;
+		gE2 = E - start_energy ;
+		gE2 /= bin_size;
+		gE2 = round(gE2);
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE2, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+		//break;
+		
+		m2 = round((sumover(s,n,dim) - start_mag)/mag_step);
+		
+		
+		if ( gE2 < 0 || gE1 < 0 || gE1 > n_bins || gE2 > n_bins || m1 > n_bins || m2 > n_bins || m1 < 0 || m2<0) {
+			printf ("GE1: %d Ge2: %d\n", gE1, gE2);
+			printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE2, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+			exit(1);
+		}
+		
+					
+		eta = g_e[ai(gE1, m1,0, n_bins)] - g_e[ai(gE2, m2,0, n_bins)];
+		
+		r = (double) rand()/RAND_MAX;
+		
+		if (ge_min <=0) {
+			printf("WHOA!!! ge_min == 0\n");
+			exit(1);
+		}
+		
+		/* Check to see if we hit a new bin*/
+		if(g_e[ai(gE2,m2,0,n_bins)] == 0) {
+			for (i = 0; i < n_bins*n_bins; i++)
+				visit[i] = 0;
+			g_e[ai(gE2,m2,0,n_bins)] = ge_min;
+		}
+		
+		
+		if (r <= exp(eta) ){// || g_e[ai(gE2, m2,0, n_bins)] < g_e[ai(gE1,m1,0,n_bins)]) {
+			// Flip Accepted;
+			g_e[ai(gE2, m2,0, n_bins)] += f;
+			ge_min = (g_e[ai(gE2, m2,0, n_bins)] < ge_min  && g_e[ai(gE2, m2,0, n_bins)] != 0)?  g_e[ai(gE2, m2,0, n_bins)]: ge_min;
+			visit[ai(gE2, m2,0, n_bins)] += 1;	
+			gE1 = gE2;
+			m1 = m2;		
+		} else {
+			// Flip the Spin back
+			s[site].s = -s[site].s;
+			visit[ai(gE1, m1, 0,n_bins)] += 1;
+			g_e[ai(gE1, m1,0, n_bins)] += f;
+			ge_min = (g_e[ai(gE1, m1,0, n_bins)] < ge_min && g_e[ai(gE1, m1,0, n_bins)] != 0)?  g_e[ai(gE1, m1,0, n_bins)]: ge_min;
+			
+		}
+		
+		steps++;
+		/* decide if the histogram is flat */
+
+		if (steps%10000 == 0) {
+			avg = 0;
+			n_avg = 0;
+			//printf("MCS: %lld Checking Flatness...", steps);
+			flat = 1;
+			v_min = visit[0];
+			for(i = 0; i < n_bins*n_bins; i++) {
+				if(g_e[i] != 0) {
+					avg += visit[i];
+					v_min = (v_min < visit[i])? v_min:visit[i];
+					n_avg ++;
+				} 
+			}
+			avg /= (double) n_avg;
+			if (n_avg <= 2) {
+				flat = 0;
+				continue;
+			}
+						
+			if(v_min > (0.95*avg)) {
+			//DEBUGLINE	printf("Yes!\n");
+				f = f*0.5;
+				flat = 0;
+				printf("MCS: %lld Histogram is Flat\nMoving to F=%lf\n", steps, f);
+				if (f <= threshold) {
+					for(j =0; j < n_bins; j++) {
+						for (i=0; i < n_bins; i++) {
+							if(g_e[ai(i,j,0,n_bins)]!=0)
+							printf("%lf\t%lf\t%lf\n", (start_energy+i*bin_size), (start_mag+j*bin_size), g_e[ai(i,j,0,n_bins)]);
+						}
+						//printf("\n");
+					}
+				}
+				for(i=0; i < n_bins*n_bins; i ++)
+						visit[i] = 0;		
+			}
+		}
+	}
+	return(g_e);
+}
+	
+
+
+double * wang(spintype *s, int n, int dim, double field, int *n_bin) {
+	double bin_size =1; 
+	int n_bins;
+	int site, i;
+	long long int steps =0;
+	double E;
+	double eta,r;
+	int gE1, gE2;
+	double end_energy;
+	double start_energy;
+	int flat=0;
+	double avg;
+	double * g_e;
+	int *visit;
+	double f;
+	int n_avg;
+	double threshold;
+	double ge_min = 1000;
+	int old_site = n*n*n*n*n;
+	double norm;
+
+	
+	
+	start_energy = -(s[0].n_neigh/2)*pow(n,dim);
+	end_energy = (s[0].n_neigh/2)*pow(n,dim);
+	
+	n_bins = abs((end_energy - start_energy)/bin_size + 0.5);
+	*n_bin = n_bins;
+	g_e = malloc(sizeof(double)*n_bins);
+	visit = malloc(sizeof(int)*n_bins);
+	
+	if (g_e == NULL || visit == NULL ) {
+		printf("Couldn't get memory for histograms\n");
+		exit(1);
+	}
+	
+	for (i = 0; i < n_bins; i++) {
+		//Initialise Bins
+		g_e[i] = 0.0;
+		g_e[n_bins+i] = 0.0;
+		visit[i] = 0;
+	}
+	
+	f = 1;
+	threshold = 1e-2;
+	while (f > threshold) {
+		//Find G(E1)
+		
+		site = round((double)(pow(n,dim) * (double) rand())/RAND_MAX);
+		if (site == old_site) {
+			//printf("Got site %d again\n", site);
+			continue;
+		}
+		old_site = site;
+		E = energy_calc(s, n, dim, field) * pow(n,dim);
+		gE1 = E - start_energy;
+		gE1 /= bin_size;
+		gE1 = round(gE1);
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE1, start_energy+(gE1*bin_size), start_energy+((gE1+1)*bin_size));
+		// Flip spin and get G(E2)
+		s[site].s = -s[site].s;
+		E = energy_calc(s, n, dim, field)* pow(n,dim);
+		gE2 = E;
+		gE2 = E - start_energy ;
+		gE2 /= bin_size;
+		gE2 = round(gE2);
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE2, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+		//break;
+		
+		
+		
+		if ( gE2 < 0 || gE1 < 0 || gE1 > n_bins || gE2 > n_bins) {
+			printf ("GE1: %d Ge2: %d\n", gE1, gE2);
+			printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE2, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+			exit(1);
+		}
+		
+					
+		eta = g_e[gE1] - g_e[gE2];
+		
+		r = (double) rand()/RAND_MAX;
+		
+		if(g_e[gE2] == 0) {
+			for (i = 0; i < n_bins; i++)
+				visit[i] = 0;
+			g_e[gE2] = ge_min;
+		}
+		
+		
+		if (r <= exp(eta)  || g_e[gE2] < g_e[gE1]) {
+			// Flip Accepted;
+			g_e[gE2] += f;
+			ge_min = (g_e[gE2] < ge_min && g_e[gE2] != 0)?  g_e[gE2]: ge_min;
+			visit[gE2] += 1;			
+		} else {
+			// Flip the Spin back
+			s[site].s = -s[site].s;
+			visit[gE1] += 1;
+			g_e[gE1] += f;
+			ge_min = (g_e[gE1] < ge_min && g_e[gE1] != 0)?  g_e[gE1]: ge_min;
+			
+		}
+		
+		steps++;
+		/* decide if the histogram is flat */
+
+		if (steps%10000 == 0) {
+			avg = 0;
+			n_avg = 0;
+		//	printf("MCS: %lld Checking Flatness...", steps);
+			flat = 1;
+			for(i = 0; i < n_bins; i++) {
+				if(g_e[i] != 0) {
+					avg += visit[i];
+					n_avg ++;
+				}
+			}
+			avg /= (double) n_avg;
+			if (n_avg <= 2)
+				flat = 0;
+		//	printf("Avg: %lf over %d bins\n", avg, n_avg);
+			for (i=0; i < n_bins; i++) {
+				if ((g_e[i]!= 0) && (fabs((double) visit[i] - avg)/ avg > 0.05)) {
+					flat = 0;
+					//printf("%d - %lf / %lf = %lf", visit[i], avg, avg, (visit[i] - avg)/avg);
+				//	printf("Nope Ratio of %lf\n", fabs(visit[i]/avg));
+					break;
+				}
+			}
+		//	steps = 0;
+		}
+		if(flat == 1) {
+		//	printf("Yes!\n");
+			f = f*0.5;
+			flat = 0;
+			printf("MCS: %lld Histogram is Flat\nMoving to F=%lf\n", steps, f);
+			if (f <= threshold) {
+				//printf("%lf\n%lf\n", g_e[0],g_e[n_bins-1]);
+				norm = g_e[0] - log(2);
+				for (i = 0; i < n_bins; i++) {
+					if(g_e[i] != 0) {
+						
+					//	printf("%lf\t%d\t%lf\t%lf\n", (start_energy+i*bin_size), visit[i], g_e[i]-norm, g_e[i]);
+						g_e[i] = g_e[i] - norm;
+					}
+				}
+			}
+			for(i=0; i < n_bins; i ++)
+					visit[i] = 0;		
+		} 
+	}
+	return(g_e);
+}
+
+
+double energy_calc(spintype * s, int n, int dim, double field) {
+	int i,l,j;
+	double result;
+	result = 0;
+	j = pow(n,dim);
+	for (i=0; i < j; i ++) {
+		for (l = 0; l < s[i].n_neigh; l ++) {
+			result += 0.5*coupling[s[i].neigh_couple[l]] * s[i].s * s[s[i].neighbours[l]].s ;
+		}
+		result += -s[i].s * field;
+	}
+
+	result = (double) result / pow(n,dim);
+	return result;
+}
+
+
+double * dos2g_e(double * dos, int bins) {
+	int i,j;
+	double * g_e;
+	g_e = malloc(sizeof(double) * bins);
+	if(!g_e) {
+		
+	}
+	for (i = 0; i < bins; i++ ) {
+		g_e[i] = 0;
+		for(j=0; j < bins; j++) {
+			g_e[i] += dos[ai(i,j,0,bins)];
+		}
+	}
+	return(dos);
+}
+
+double dos2energy(double * dos, int bins, int n, int dim, double start_energy, double T, double field) {
+	double top, bottom, E;
+	int i;
+	top = 0;
+	bottom = 0;
+	for(i = 0; i < bins; i++) {
+		E = (start_energy + i);
+		top +=  E * exp(dos[i] - E/T);
+		bottom += exp(dos[i]) * exp(-E/T);
+	}
+	printf("%g\t%g/%g\n", T, top, bottom);
+	E = top/bottom;
+	E /= pow(n,dim);
+	if(isnan(E)) {
+		fprintf(stderr, "Energy calc failed, got E is Nan, from %lf and %lf\n", top, bottom);
+		exit(EXIT_FAILURE);
+	}
+	return(E);
+	}
+
+
+double dos2mag(double * dos, int bins, double start_mag, double mag_step, double start_energy, double T, double field) {
+	double top;
+	double bottom;
+	double temp;
+	double E;
+	double M;
+	double mag;
+	int i,j;
+	bottom = 0;
+	double H;
+	for (i =0; i < bins; i ++) {
+		E = (start_energy*i);
+		for (j =0; j < bins; j ++) {
+			M = (start_mag*i*mag_step);
+			temp = dos[ai(i,j,0,bins)] - H/(kb*T);
+			bottom += exp(temp);
+		}
+	}
+	top = 0;
+	for(i=0; i < bins; i ++) {
+		E = (start_energy*i);
+		for(j =0; j < bins; j++) {
+			M = (start_mag*i*mag_step);
+			H = E - field*M;
+			temp = log(M)+dos[ai(i,j,0,bins)]-H/(kb*T);
+			top += exp(temp);
+		}
+	}
+	mag = top/bottom;
+	if (isnan(mag)) {
+		fprintf(stderr, "Magnetisation calc failed, got E is Nan, from %lf and %lf\n", top, bottom);
+		return(0);
+	}
+	return(mag);
+}
+		
+	
+			
+	
+
+
+
+double * dos2g_m(double * dos, int bins) {
+	int i,j;
+	double * g_m;
+	g_m = malloc(sizeof(double) * bins);
+	if(!g_m) {
+		
+	}
+	for (i = 0; i < bins; i++ ) {
+		g_m[i] = 0;
+		for(j=0; j < bins; j++) {
+			g_m[i] += dos[ai(j,i,0,bins)];
+		}
+	}
+	return(dos);
+}
+	
+		
+		
+	
+	
+	
+	

@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l select=16:ncpus=1:mem=400mb,walltime=8:00:00,place=free
+#PBS -V
+#PBS -N WL16.out
+#PBS -M a.h.brown@warwick.ac.uk
+#PBS -m abe
+cd $PBS_O_WORKDIR
+time mpirun ./wangmpi 8 
+mv ./dos.mpi.bin /home/phrhbo/
+
+

@@ -1,0 +1,9 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=1:mem=200mb,walltime=72:00:00
+#PBS -V
+#PBS -N error10-1e4f 
+cd $PBS_O_WORKDIR
+./ising_error 
+
+
+

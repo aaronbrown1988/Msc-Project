@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1,mem=400mb,walltime=8:00:00
+#PBS -V
+#PBS -N WL-Field
+#PBS -M A.H.Brown@warwick.ac.uk
+#pbs -m abe
+cd $PBS_O_WORKDIR
+time wang 
+
+
+

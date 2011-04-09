@@ -1,0 +1,11 @@
+#!/bin/bash
+#PBS -l nodes=16:ppn=1,mem=400mb,walltime=8:00:00
+#PBS -V
+#PBS -N s50f1e432
+#PBS -M A.h.brown@warwick.ac.uk
+#PBS -m abe
+cd $PBS_O_WORKDIR
+mpirun ./replica 50 2 2 0.1 0.1 5.0 10000
+
+
+
