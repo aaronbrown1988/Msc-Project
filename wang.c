@@ -36,6 +36,10 @@ int main(int argc, char * argv[]) {
 	initSpins(s,n,dim);
 	//metropolis(s, n, dim, 1000, 1, &ratio, 0);
 	
+	if (argc == 2) 
+		B = atof(argv[1]);
+	
+	
 	results = wang2(s,n,dim ,4.0, &n_bins);
 	
 	SAVE = fopen("./dos.bin", "wb");
