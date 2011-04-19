@@ -64,5 +64,6 @@ void print_system(spintype *, int, int);
 void fprint_system(spintype *, int , int, char *);
 double swetnam_factor(int*, int,int, unsigned long int, double);
 int save_system(spintype *, int, int , char *);
+double * jarzinski(spintype *, int , int , double , double , double , int , int );
 spintype * load_system(char *);
 #endif

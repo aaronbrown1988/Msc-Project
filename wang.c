@@ -40,7 +40,7 @@ int main(int argc, char * argv[]) {
 		B = atof(argv[1]);
 	
 	
-	results = wang2(s,n,dim ,4.0, &n_bins);
+	results = wang2(s,n,dim ,B, &n_bins);
 	
 	SAVE = fopen("./dos.bin", "wb");
 	ret_val = fwrite(results, sizeof(double), (n_bins+1)*(n_bins+1), SAVE);

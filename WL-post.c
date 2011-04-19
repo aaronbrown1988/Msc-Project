@@ -159,8 +159,9 @@ int main(int argc, char *argv[]) {
 	}
 	
 	/* Free energy */
-	for(i =0; i< 120; i +=01) {
-		for (temp1 = 0.0005; temp1 < 0.005; temp1 += 0.0005) {
+	i =0;
+	//for(i =0; i< 120; i +=01) {
+		for (temp1 = 0.05; temp1 < 0.5; temp1 += 0.025) {
 			temp3 =0;
 			sprintf(buffer, "T%06.3lf-B%06.3lf", temp1, (double)i*0.1);
 			FL = fopen(buffer, "w");
@@ -187,7 +188,7 @@ int main(int argc, char *argv[]) {
 			}
 					
 
-/* inverted loops such they run over mag then energy 6/4/11 */
+		/* inverted loops such they run over mag then energy 6/4/11 */
 
 			for (j=0; j<n_bins; j++) {
 				for(k=0; k < wbins; k++) {
@@ -233,7 +234,7 @@ int main(int argc, char *argv[]) {
 			
 		}
 		fprintf(output, "\n");
-	}
+	//}
 	fclose(output);
 
 	return(0);

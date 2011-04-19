@@ -36,6 +36,9 @@ wang: isinglib2.o wang.o
 jar_sweep: isinglib2.o jar_sweep.o
 	$(LD) -o $(BIN)/jar_sweep jar_sweep.o isinglib2.o $(LDFLAGS)
 	
+ti: isinglib2.o ti.o
+	$(LD) -o $(BIN)/ti ti.o isinglib2.o $(LDFLAGS)
+		
 wang3d: isinglib2.o wang3d.o
 	$(LD) -o $(BIN)/wang3d wang3d.o isinglib2.o $(LDFLAGS)
 	

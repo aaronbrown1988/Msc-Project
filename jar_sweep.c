@@ -5,6 +5,8 @@
 int main(int argc, char *argv[]) {
 	spintype *s;
 	int n=12,dim=2;
+	int iterations;
+	int steps;
 	s = setup(2,n,dim);
 	double i,j,k;
 	double t_start, t_end,t_step;
@@ -16,24 +18,26 @@ int main(int argc, char *argv[]) {
 	coupling = coupl;
 	i = 0.075;
 	
-	if (argc != 9) {
+	if (argc != 11) {
 		fprintf(stderr, "Not enough args\n");
 		exit(EXIT_FAILURE);
 	}
 	
 	n = atoi(argv[1]);
 	dim = atoi(argv[2]);
-	t_start = atof(argv[3]);
-	t_step = atof(argv[4]);
-	t_end = atof(argv[5]);
+	t_start = atof(argv[3])/1000;
+	t_step = atof(argv[4])/1000;
+	t_end = atof(argv[5])/1000;
 	b_start = atof(argv[6]);
 	b_step = atof(argv[7]);
 	b_end = atof(argv[8]);
+	iterations = atoi(argv[9]);
+	steps = atoi(argv[10]);
 	sprintf(buffer, "jar_sweep-%d-%d-%g-%g-%g-%g-%g-%g", n,dim, t_start,t_step,t_end,b_start,b_step,b_end);
 	output = fopen(buffer, "w");
 	for (i = t_start; i < t_end; i+= t_step) {
 		for(j = b_start; j< b_end; j+= b_step) {
-			results = jarzinski(s,n,dim,i,j,j+b_step,1000,2);
+			results = jarzinski(s,n,dim,i,j,j+b_step,iterations,steps);
 			fprintf(output, "%g\t%g\t%g\t%g\t%g\n", i,j,results[0], results[1], results[2]);
 			fflush(output);
 			free(results);

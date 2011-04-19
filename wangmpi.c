@@ -11,8 +11,8 @@
 #define WALL_SAFE	0.99
 
 int main(int argc, char * argv[]) {
-	int n=12,dim=3;
-	double field;
+	int n=12,dim=2;
+	double field =0;
 	double coupl[3] = {1,1,1};
 	clock_t t1, t2;
 	FILE * SAVE;
@@ -51,15 +51,15 @@ int main(int argc, char * argv[]) {
 
 	double *recv;
 
-	if	(argc < 4) {
-		fprintf(stderr, "USAGE wangmpi WALL size thresh \n");
+	if	(argc < 5) {
+		fprintf(stderr, "USAGE wangmpi WALL size dim thresh \n");
 		exit(EXIT_FAILURE);
 	}
 	
 	n = atoi(argv[2]);
-	
+	dim = atoi(argv[3]);
 	wall = 3600*atof(argv[1]);
-	threshold = atof(argv[3]);
+	threshold = atof(argv[4]);
 	//wall = 120;
 	t1 = clock();
 	
@@ -75,6 +75,10 @@ int main(int argc, char * argv[]) {
 	n_bins = abs((end_energy - start_energy)/bin_size + 0.5);
 	mag_step = (end_mag - start_mag)/n_bins;
 	
+	
+	fprintf(stderr, "ge = %ud, visit = %ud, world_visit = %d \n ", sizeof(double)*n_bins*n_bins,sizeof(int)*n_bins*n_bins,sizeof(int)*n_bins*n_bins);
+	fprintf(stderr, "n_bins = %d, bin_size = %g, n_neigh = %d\n", n_bins, bin_size, (s[0].n_neigh/2));
+	//exit(1);
 		
 	g_e = malloc(sizeof(double)*n_bins*n_bins);
 	visit = malloc(sizeof(int)*n_bins*n_bins);
@@ -82,11 +86,12 @@ int main(int argc, char * argv[]) {
 	
 	
 	if (g_e == NULL || visit == NULL || world_visit == NULL) {
-		printf("Couldn't get memory for histograms\n");
+		fprintf(stderr,"Couldn't get memory for histograms\n");
+		fprintf(stderr, "ge = %ud, visit = %ud, world_visit = %d \n ", sizeof(double)*n_bins*n_bins,sizeof(int)*n_bins*n_bins,sizeof(int)*n_bins*n_bins);
 		exit(EXIT_FAILURE);
 	}
 	
-	if(argc == 5) {
+	if(argc == 6) {
 		//Reload us
 		SAVE = fopen("/home/phrhbo/WL.g_e", "rb");
 		fread(g_e, sizeof(double), n_bins*n_bins, SAVE);
@@ -227,7 +232,7 @@ int main(int argc, char * argv[]) {
 							fprintf(out, "%g\t%g\t%g\n", start_energy+i, start_mag+j*mag_step, g_e[ai(i,j,0,n_bins)]);
 						}
 					fprintf(out,"\n");
-				}
+					}
 				fclose(out);
 					
 					
@@ -275,11 +280,12 @@ int main(int argc, char * argv[]) {
 					//MPI_Abort(MPI_COMM_WORLD, EXIT_SUCCESS);
 					
 				}
+				free(recv);
 				MPI_Finalize();
 				exit(EXIT_FAILURE);
 					
 				
-			}	
+			}
 		}
 	}
 	
@@ -314,12 +320,14 @@ int main(int argc, char * argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	
-	
+	free(g_e);
+	free(world_visit);	
+	free(visit);
 
 	
 	
 	MPI_Finalize();
-		
+	
 
 	return(0);
 }

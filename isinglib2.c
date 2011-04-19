@@ -736,7 +736,7 @@ double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
 				printf("MCS: %lld Histogram is Flat\nMoving to F=%lf\n", steps, f);
 				
 				/* Save out Histogram */
-				sprintf(buffer, "Hist-%lf-%dx%d.tsv", f,n,dim);
+				sprintf(buffer, "Hist-%lf-%dx%d-%g.tsv", f,n,dim,field);
 				out = fopen(buffer, "w");
 				fprintf(out, "#E\tM\tVal\n");
 				for (i = 0; i < n_bins; i ++) {
@@ -1258,35 +1258,35 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		/* Forward */
 		//Randomize spins
 		initSpins(s,n,dim);
-		sprintf(buffer,"./%d-fwd.tsv", j);
-		//out = fopen(buffer, "w");
+		sprintf(buffer,"./%g-B%g-%g-run:%d-fwd.tsv", T,B_start, B_end, j);
+		out = fopen(buffer, "w");
 		
 		metropolis(s,n,dim, 1e4, T, &ratio, B_start);
 		
 		for (i =0; i <= steps; i ++) {
 			FW[j] += -sumover(s,n,dim)*B_step;
 			metropolis(s,n,dim,1,T,&ratio,B_start+i*B_step);
-		//	fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
-		//	fflush(out);
+			fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
+			fflush(out);
 			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
 		//	fprint_map(s,n,dim,buffer);
 		}
-		//fclose(out);
+		fclose(out);
 		/*Reverse */
 		initSpins(s,n,dim);
 		
 		metropolis(s,n,dim,1e4,T,&ratio,B_end);
 		sprintf(buffer,"./%d-rev.tsv", j);
-		//out = fopen(buffer, "w");
+		out = fopen(buffer, "w");
 		for (i =0; i < steps; i++) {
 			REV[j] += sumover (s,n,dim) * B_step;
 			metropolis(s,n,dim,1,T,&ratio, B_end - i *B_step);
-			//fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
+			fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
 			//fflush(out);
 			sprintf(buffer, "./map-rev-%07d-%07d.tsv", j,i);
 			//	fprint_map(s,n,dim,buffer);
 		}
-		//fclose(out);
+		fclose(out);
 		
 		
 	}
@@ -1415,3 +1415,44 @@ void glauber(spintype *s, int n, int dim, long int flips, double temperature, do
 	cs = NULL;
 	*ratio = (*ratio)/tries;
 }
+
+
+double  thermal_integration(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
+	int i,j;
+	double *M = NULL;
+	double dH;
+	double dF;
+	double *results = NULL;
+	double ratio;
+	
+	M = malloc(sizeof(double)*steps);
+	if (M == NULL) {
+		fprintf(stderr, "Couldn;t get memory for M\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	for (i =0; i < steps; i++)
+		M[i] = 0;
+	
+	dH = (double)(B_end - B_start)/steps;
+	for (i =0; i < runs ; i ++) {
+		for (j =0; j < steps; j ++) {
+			metropolis(s,n,dim,2500,T,&ratio,(B_start+i*dH));
+			M[j] += sumover(s,n,dim)/pow(n,dim);
+		}
+	}
+	for (i =0; i < steps; i++)
+		M[i] = M[i]/runs;
+	dF=0;
+	for(i =1; i < (steps-1); i++) 
+		dF += M[i];
+		
+	dF = -dH*(0.5*(M[0] - M[steps-1])+ dF);
+	
+	return(dF);
+}
+		
+		
+	
+	
+	
