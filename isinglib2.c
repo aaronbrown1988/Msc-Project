@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -19,10 +20,6 @@
 
 #define DEBUG 0
 
-
-
-const double  j_1 = -1; // in plane Anti-ferromagentic Coupling
-const double  j_2 = -1; // z -direction Anti-Ferromagnetic coupling
 //double kb = 1.3806503e-23;
 const double kb = 1;
 
@@ -57,7 +54,7 @@ double * run_model(double temperature, double field, double * coupl, long int fl
 			
 	if ((flips > 1000) && DEBUG == 1) {
 		fprintf(stderr, "DEBUG SET FOR PRODUCTION RUN\n");
-	//	exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 		
 	for (i = 0; i < blocks; i++) {
@@ -411,7 +408,6 @@ void wolff(spintype *s, int n, int dim, long int flips, double temperature, doub
 	short int exist;
 	double r, prob;
 	int clust[n*n*n];
-	double mag;
 	float clust_avg = 0;
 	int tries=0;
 	*ratio = 0;
@@ -492,7 +488,6 @@ void vert_wolff(spintype *s, int n, int dim, long int flips, double temperature,
 	short int exist;
 	double r, prob;
 	int clust[n*n*n];
-	double mag;
 	float clust_avg = 0;
 	int tries=0;
 	*ratio = 0;
@@ -542,7 +537,6 @@ void vert_wolff(spintype *s, int n, int dim, long int flips, double temperature,
 					if (r < prob) {
 						// Check if spins are parallel || anti-paralel as required
 						if ((exist == 0) && (s[m].s == s[x].s ) ) {
-		//				if ((exist == 0) && (s[m].s == s[x].s )) {
 							*ratio = *ratio +1;
 							clust[clust_n] = x;
 							clust_n++;
@@ -1223,7 +1217,7 @@ spintype * load_system(char * filename) {
 }
 
 double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
-	int i,j,k; // generic loop variables
+	int i,j; // generic loop variables
 	double *FW=NULL, *REV=NULL;
 	double ratio;
 	double B_step;
@@ -1231,7 +1225,9 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	double P,WR,WF;
 	double alpha, dF;
 	char buffer[1000];
+	double *M, *E;
 	FILE * out;
+	FILE *outr;
 
 	double * results;
 
@@ -1241,6 +1237,8 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	REV = malloc(sizeof(double) *runs);
 	
 	results = malloc(sizeof(double)*2);
+	M = malloc(sizeof(double)*steps*2);
+	E = malloc(sizeof(double)*steps*2);
 	
 	
 	if (!FW || !REV) {
@@ -1254,42 +1252,59 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		REV[i]=0;
 	}
 	
+	for(i =0; i < 2*steps; i++) {
+		M[i] =0;
+		E[i] = 0;
+	}
+	
+	sprintf(buffer,"./%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	out = fopen(buffer, "w");
+	sprintf(buffer,"./%g-B%g-%g-rev.tsv", T,B_start, B_end );
+	outr = fopen(buffer, "w");
 	for(j =0; j < runs; j++) {
 		/* Forward */
 		//Randomize spins
 		initSpins(s,n,dim);
-		sprintf(buffer,"./%g-B%g-%g-run:%d-fwd.tsv", T,B_start, B_end, j);
-		out = fopen(buffer, "w");
 		
 		metropolis(s,n,dim, 1e4, T, &ratio, B_start);
 		
 		for (i =0; i <= steps; i ++) {
 			FW[j] += -sumover(s,n,dim)*B_step;
 			metropolis(s,n,dim,1,T,&ratio,B_start+i*B_step);
-			fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
-			fflush(out);
+			E[i] += energy_calc(s,n,dim,B_start+i*B_step);
+			M[i] += (sumover(s,n,dim)/pow(n,dim));
 			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
 		//	fprint_map(s,n,dim,buffer);
 		}
-		fclose(out);
+		//fclose(out);
 		/*Reverse */
 		initSpins(s,n,dim);
 		
 		metropolis(s,n,dim,1e4,T,&ratio,B_end);
-		sprintf(buffer,"./%d-rev.tsv", j);
-		out = fopen(buffer, "w");
 		for (i =0; i < steps; i++) {
 			REV[j] += sumover (s,n,dim) * B_step;
 			metropolis(s,n,dim,1,T,&ratio, B_end - i *B_step);
-			fprintf(out, "%d\t%lf\t%lf\n", i, energy_calc(s,n,dim,B_start+i*B_step), sumover(s,n,dim)/pow(n,dim));
+			E[steps+i] += energy_calc(s,n,dim,B_start+i*B_step);
+			M[steps+i] += (sumover(s,n,dim)/pow(n,dim));
 			//fflush(out);
 			sprintf(buffer, "./map-rev-%07d-%07d.tsv", j,i);
 			//	fprint_map(s,n,dim,buffer);
 		}
-		fclose(out);
 		
 		
 	}
+	
+	for(i =  0; i < steps; i++) {
+		M[i] = M[i]/runs;
+		E[i] = E[i]/runs;
+		M[steps+i] = M[steps+i]/runs;
+		E[steps+i] = E[steps+i]/runs;
+		
+		fprintf(out, "%d\t%g\t%g\n", i, M[i], E[i]);
+		fprintf(outr, "%d\t%g\t%g\n", i, M[steps+i], E[steps+i]);
+	}
+	fclose(outr);
+	fclose(out);
 	WF = 0;
 	WR = 0;
 	for (j =0; j<runs; j ++) {
@@ -1417,12 +1432,11 @@ void glauber(spintype *s, int n, int dim, long int flips, double temperature, do
 }
 
 
-double  thermal_integration(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
+double  thermal_integration(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps, int gmcs) {
 	int i,j;
 	double *M = NULL;
 	double dH;
 	double dF;
-	double *results = NULL;
 	double ratio;
 	
 	M = malloc(sizeof(double)*steps);
@@ -1437,7 +1451,7 @@ double  thermal_integration(spintype *s, int n, int dim, double T, double B_star
 	dH = (double)(B_end - B_start)/steps;
 	for (i =0; i < runs ; i ++) {
 		for (j =0; j < steps; j ++) {
-			metropolis(s,n,dim,2500,T,&ratio,(B_start+i*dH));
+			metropolis(s,n,dim,gmcs,T,&ratio,(B_start+i*dH));
 			M[j] += sumover(s,n,dim)/pow(n,dim);
 		}
 	}

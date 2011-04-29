@@ -10,7 +10,7 @@ int main(int argc, char * argv[]) {
 	//const double kb = 1;
 	int i,j;
 	double * results;
-	int n = 14;
+	int n = 12;
 	int dim = 2;
 	double T=0.75;
 	double start_energy, E;
@@ -21,7 +21,7 @@ int main(int argc, char * argv[]) {
 	//double coupl[3] = {3.678208e-22,3.678208e-22,3.678208e-22};
 	double coupl[3] = {1,1,1};
 	double *ent;
-	double B;
+	double B=0;
 	int ret_val;
 	
 	FILE *SAVE;

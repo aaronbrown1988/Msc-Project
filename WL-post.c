@@ -110,26 +110,26 @@ int main(int argc, char *argv[]) {
 	start_mag -= (14*14);
 	end_mag -= (14*14);
 	*/
-	
+	/*
 	start_energy /= (14*14);
 	end_energy /= (14*14);
 	bin_size /= (14*14);
 	start_mag /= (14*14);
 	end_mag /= (14*14);
 	mag_step /= (14*14);
-	
+	*/
 	
 		
-	/*start_energy /= (12*12); // *12);
+	start_energy /= (12*12); // *12);
 	end_energy /= (12*12); // *12);
 	bin_size /= (12*12); // *12);
 	start_mag /= (12*12); // *12);
 	end_mag /= (12*12); // *12);
 	mag_step /= (12*12); // *12);
-	*/
 	
 	
-	close(snap);
+	
+	fclose(snap);
 	
 	
 	/* Normalize DOS*/
@@ -160,19 +160,19 @@ int main(int argc, char *argv[]) {
 	
 	/* Free energy */
 	i =0;
-	//for(i =0; i< 120; i +=01) {
+	for(i =0; i< 120; i +=01) {
 		for (temp1 = 0.05; temp1 < 0.5; temp1 += 0.025) {
 			temp3 =0;
 			sprintf(buffer, "T%06.3lf-B%06.3lf", temp1, (double)i*0.1);
 			FL = fopen(buffer, "w");
 			hold = 1e99;
 			/* create new work array */
-			start_energy2 = start_energy - i*0.1;
-			end_energy2 = end_energy + i*0.1;
+			start_energy2 = start_energy - (i+1)*0.1;
+			end_energy2 = end_energy + (i+1)*0.1;
 			wbins = (end_energy2 -start_energy2)/bin_size;
-			if (i == 0 && start_energy2 != start_energy && wbins != n_bins) {
-				printf("start %g !=  %g, end %g != %g, bins: %d != %d\n", start_energy, start_energy2, end_energy, end_energy2, n_bins, wbins);
-				exit(EXIT_FAILURE);
+			if (i == 0 && start_energy2 > start_energy && wbins < n_bins) {
+				printf("start %g <  %g, end %g > %g, ||bins: %d > %d\n", start_energy, start_energy2, end_energy, end_energy2, n_bins, wbins);
+			//	exit(EXIT_FAILURE);
 			}
 				
 			work = malloc(n_bins*wbins*sizeof(double));
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
 			for (k =0; k < n_bins; k++) {
 				for(j=0; j<n_bins; j++) {
 					mbin = j;
-					ebin = (((start_energy+k*bin_size)+(start_mag+j*mag_step)*i*0.1)-start_energy2)/bin_size;
+					ebin = (((start_energy+k*bin_size)-(start_mag+j*mag_step)*i*0.1)-start_energy2)/bin_size;
 					work[ai(mbin,ebin,0,n_bins)] += dos[ai(k,j,0,n_bins)];
 				}
 			}
@@ -234,7 +234,8 @@ int main(int argc, char *argv[]) {
 			
 		}
 		fprintf(output, "\n");
-	//}
+
+	}
 	fclose(output);
 
 	return(0);
