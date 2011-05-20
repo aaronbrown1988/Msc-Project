@@ -15,7 +15,7 @@ j=75
 		
 		echo $k
 		
-		output_dir=/home/phrhbo/Model/output/jarzinski/sweeps/2step/
+		output_dir=/home/phrhbo/Model/output/jarzinski/sweeps/200step/
 			
 		mkdir -p $output_dir
 	
@@ -24,7 +24,7 @@ j=75
 
 		cp ~/Model/bin/jar_sweep $output_dir
 
-		cat ~/Model/bin/ising_mag.pbs | sed -e "s/ising_mag/jar_sweep 12 2 ${j} 25 $(($j+25)) ${i} 0.1 ${k} 10000 2/"  > $output_dir/jar_sweep_${j}_${i}.pbs
+		cat ~/Model/bin/ising_mag.pbs | sed -e "s/ising_mag/jar_sweep 12 2 ${j} 25 $(($j+25)) ${i} 0.1 ${k} 10000 200/"  > $output_dir/jar_sweep_${j}_${i}.pbs
 
 	
 		cd $output_dir

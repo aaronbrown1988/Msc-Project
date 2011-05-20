@@ -6,6 +6,7 @@
 #include "./isinglib2.h"
 #include <limits.h>
 #include <string.h>
+#include <float.h>
 
 
 
@@ -570,7 +571,7 @@ void vert_wolff(spintype *s, int n, int dim, long int flips, double temperature,
 
 
 
-double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
+double * wang2(spintype *s, int n, int dim, double field, int *n_bin, double *g_e, double f, double threshold) {
 	double bin_size =1; 
 	int n_bins;
 	int site, j,i;
@@ -582,11 +583,8 @@ double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
 	double start_energy;
 	int flat=0;
 	double avg;
-	double * g_e;
 	int *visit;
-	double f;
 	int n_avg;
-	double threshold;
 	double ge_min = 1000;
 	int old_site = n*n*n*n*n;
 	//double norm=0;
@@ -611,7 +609,12 @@ double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
 	
 	*n_bin = n_bins;
 	
-	g_e = malloc(sizeof(double)*n_bins*n_bins);
+	if (f == 1) {
+		fprintf(stderr, "starting from scratch\n");
+		g_e = malloc(sizeof(double)*n_bins*n_bins);
+	} else {
+		ge_min = DBL_MAX;
+	}
 	visit = malloc(sizeof(int)*n_bins*n_bins);
 	
 	if (g_e == NULL || visit == NULL ) {
@@ -621,12 +624,12 @@ double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
 	
 	for (i = 0; i < n_bins*n_bins; i++) {
 		//Initialise Bins
-		g_e[i] = 0.0;
+		if(f==1) {
+			g_e[i] = 0.0;
+		}
 		visit[i] = 0;
 	}
 	
-	f = 1;
-	threshold = 1e-6;
 	E = energy_calc(s, n, dim, field) * pow(n,dim);
 	gE1 = E - start_energy;
 	gE1 /= bin_size;
@@ -638,7 +641,7 @@ double * wang2(spintype *s, int n, int dim, double field, int *n_bin) {
 		site = round((double)(pow(n,dim) * (double) rand())/RAND_MAX);
 		if (site == old_site) {
 			//printf("Got site %d again\n", site);
-			continue;
+			//continue;
 		}
 		old_site = site;
 		
@@ -1217,7 +1220,7 @@ spintype * load_system(char * filename) {
 }
 
 double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
-	int i,j; // generic loop variables
+	int i,j,k; // generic loop variables
 	double *FW=NULL, *REV=NULL;
 	double ratio;
 	double B_step;
@@ -1225,10 +1228,17 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	double P,WR,WF;
 	double alpha, dF;
 	char buffer[1000];
+	int e_bins,m_bins;
 	double *M, *E;
 	FILE * out;
 	FILE *outr;
+	double start_e;
+	double e_step;
+	
+	
+	double **e_hist, **m_hist;
 
+	double x;
 	double * results;
 
 	B_step = (B_end - B_start)/steps;
@@ -1237,9 +1247,29 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	REV = malloc(sizeof(double) *runs);
 	
 	results = malloc(sizeof(double)*2);
-	M = malloc(sizeof(double)*steps*2);
-	E = malloc(sizeof(double)*steps*2);
+	M = malloc(sizeof(double)*(steps*2+2));
+	E = malloc(sizeof(double)*(steps*2+2));
+	e_hist = malloc(sizeof(double*) *(steps+1));
+	m_hist = malloc(sizeof(double*) * (steps+1));
+		
+	e_step = 1/pow(n,dim);
+	start_e = (-3 - B_end);
+	e_bins = round((double)(-start_e - start_e)/e_step);
+	m_bins = 2/0.1;
+
 	
+	
+	for (i = 0; i <= steps; i++) {
+		e_hist[i] = malloc(sizeof(double)*e_bins);
+		m_hist[i] = malloc(sizeof(double) * m_bins);
+		for(j =0; j < e_bins; j++) {
+			e_hist[i][j] = 0;
+		}
+		for(j =0; j < m_bins; j++) {
+			m_hist[i][j] = 0;
+		}
+	}
+		
 	
 	if (!FW || !REV) {
 		fprintf(stderr, "Couldn't allocate work done bins\n");
@@ -1273,6 +1303,10 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 			metropolis(s,n,dim,1,T,&ratio,B_start+i*B_step);
 			E[i] += energy_calc(s,n,dim,B_start+i*B_step);
 			M[i] += (sumover(s,n,dim)/pow(n,dim));
+			k = (sumover(s,n,dim)/pow(n,dim)+1)/0.1;
+			m_hist[i][k] ++;
+			k = (energy_calc(s,n,dim,B_start+i*B_step) - start_e)/e_step;
+			e_hist[i][k] ++;
 			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
 		//	fprint_map(s,n,dim,buffer);
 		}
@@ -1281,11 +1315,15 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		initSpins(s,n,dim);
 		
 		metropolis(s,n,dim,1e4,T,&ratio,B_end);
-		for (i =0; i < steps; i++) {
+		for (i =0; i <= steps; i++) {
 			REV[j] += sumover (s,n,dim) * B_step;
 			metropolis(s,n,dim,1,T,&ratio, B_end - i *B_step);
-			E[steps+i] += energy_calc(s,n,dim,B_start+i*B_step);
-			M[steps+i] += (sumover(s,n,dim)/pow(n,dim));
+			E[steps+i+1] += energy_calc(s,n,dim,B_end-i*B_step);
+			M[steps+i+1] += (sumover(s,n,dim)/pow(n,dim));
+			x=sumover(s,n,dim)/pow(n,dim);
+			if(x > 1) {
+				printf("Got mag of %lf on step %d of run %d\n", x,i,j);
+			}
 			//fflush(out);
 			sprintf(buffer, "./map-rev-%07d-%07d.tsv", j,i);
 			//	fprint_map(s,n,dim,buffer);
@@ -1294,17 +1332,38 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		
 	}
 	
-	for(i =  0; i < steps; i++) {
+	for(i =  0; i <= steps; i++) {
 		M[i] = M[i]/runs;
 		E[i] = E[i]/runs;
-		M[steps+i] = M[steps+i]/runs;
-		E[steps+i] = E[steps+i]/runs;
+		M[steps+i+1] = M[steps+i+1]/runs;
+		E[steps+i+1] = E[steps+i+1]/runs;
 		
 		fprintf(out, "%d\t%g\t%g\n", i, M[i], E[i]);
-		fprintf(outr, "%d\t%g\t%g\n", i, M[steps+i], E[steps+i]);
+		fprintf(outr, "%d\t%g\t%g\n", i, M[steps+i+1], E[steps+i+1]);
 	}
 	fclose(outr);
 	fclose(out);
+	sprintf(buffer,"./Mag-Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	out = fopen(buffer, "w");
+	for( i =0; i <= steps; i ++) {
+		for (j = 0; j < m_bins; j++) {
+			fprintf(out, "%lf\t%lf\t%lf\n", E[i], -1+0.1*j, m_hist[i][j]);
+		}
+	}
+	fclose(out);
+	sprintf(buffer,"./E-Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	out = fopen(buffer, "w");
+	
+	printf("%d \n", e_bins);
+	for( i =0; i <= steps; i ++) {
+		for (j = 0; j < e_bins; j++) {
+			fprintf(out, "%lf\t%lf\t%lf\n", M[i], start_e+e_step*j, e_hist[i][j]);
+		}
+	}
+	fclose(out);
+	
+	
+	
 	WF = 0;
 	WR = 0;
 	for (j =0; j<runs; j ++) {

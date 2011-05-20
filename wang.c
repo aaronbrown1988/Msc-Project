@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "isinglib2.h"
 
 extern const double kb;
+
+double * WL_import(char * , int , int, double );
 
 int main(int argc, char * argv[]) {
 	//const double kb = 1.3806503e-23;
@@ -23,6 +26,8 @@ int main(int argc, char * argv[]) {
 	double *ent;
 	double B=0;
 	int ret_val;
+	double *g_e;
+	double f=1;
 	
 	FILE *SAVE;
 	
@@ -36,11 +41,17 @@ int main(int argc, char * argv[]) {
 	initSpins(s,n,dim);
 	//metropolis(s, n, dim, 1000, 1, &ratio, 0);
 	
-	if (argc == 2) 
+	if (argc >= 2) 
 		B = atof(argv[1]);
 	
-	
-	results = wang2(s,n,dim ,B, &n_bins);
+	if (argc >= 3 ) {
+		/* restarting */
+		fprintf(stderr,"Attempting to restart\n");
+		g_e = WL_import(argv[2], n,dim, B);
+		f = atof(argv[3]);
+	}
+		
+	results = wang2(s,n,dim ,B, &n_bins, g_e, f, 1e-8);
 	
 	SAVE = fopen("./dos.bin", "wb");
 	ret_val = fwrite(results, sizeof(double), (n_bins+1)*(n_bins+1), SAVE);
@@ -116,3 +127,52 @@ int main(int argc, char * argv[]) {
 
 	return(0);
 }
+
+
+double * WL_import(char * filename, int n, int dim, double field) {
+	FILE *dos = NULL;
+	char * buffer;
+	int i,j, n_bins;
+	double start_energy, end_energy, start_mag, end_mag, mag_step;
+	double curr_energy=0, curr_mag=0, curr_dos=0;
+	double *g_e = NULL;
+	
+	start_energy = - 3*pow(n,dim) - field*pow(n,dim)-1;
+	end_energy = -start_energy +1;
+	start_mag = - pow(n,dim);
+	end_mag = pow(n,dim);
+	
+	n_bins = start_energy - end_energy;
+	mag_step = (end_mag- start_mag)/n_bins;
+	g_e = malloc(sizeof(double)*n_bins*n_bins);
+	
+	if (g_e == NULL) {
+		fprintf(stderr, "Couldn't get Ram for dos\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	dos = fopen( filename, "r") ;
+	if (dos == NULL ) {
+		fprintf(stderr, " Couldn't open %s\n", filename);
+		exit(EXIT_FAILURE);
+	}
+	buffer = malloc(sizeof(char)* 10000);
+	
+	while (!feof(dos)) {
+		fscanf(dos, "%s", buffer);
+		if (strlen(buffer) >0) {
+			/* got some data */
+			if (sscanf(buffer, "%lf\t%lf\t%lf", &curr_energy, &curr_mag,&curr_dos) > 0) {
+				i = round(curr_energy -start_energy);
+				j = round((curr_mag -start_mag)/mag_step);
+				g_e[ai(i, j, 0, n_bins)] = curr_dos;
+			} else {
+				fprintf(stderr, "Error on reading in dos, attempting to continue\n");
+			}
+		}
+	}
+	return(g_e);
+}
+			
+	
+	

@@ -2,8 +2,8 @@
 
 $min = 1e99;
 $mag_max = 0;
-#$filename = $ARGV[0];
-$filename ="/home/phrhbo/Model/output/WL4/Hist-0.000004-14x2.tsv";
+$filename = $ARGV[0];
+#$filename ="/home/phrhbo/Model/output/WL4/Hist-0.000004-14x2.tsv";
 open(DATA, $filename);
 while ($line = readline(DATA)) {
 	@vals = split (/\t/, $line);

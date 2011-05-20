@@ -58,7 +58,7 @@ double magorder(spintype *, int , int);
 double energy_calc(spintype * , int, int, double);
 double partition(double  *, int , double , double , double);
 double * wang(spintype *, int, int, double, int *,double);
-double * wang2(spintype *, int , int , double , int *);
+double * wang2(spintype *, int , int , double, int*, double*, double , double );
 double * run_model(double, double, double *, long int, long int, int, int,int, int, int );
 double dos2mag(double *, int, double , double , double, double , double);
 void print_system(spintype *, int, int);
