@@ -17,6 +17,7 @@ int main (int argc, char * argv[]) {
 	double *f;
 	double field;
 	double de, dm;
+	double scaling;
 	
 	/*open free energy landscape for reading */
 	map = fopen(argv[1], "r");
@@ -27,6 +28,7 @@ int main (int argc, char * argv[]) {
 	n = atoi(argv[2]);
 	dim = atoi(argv[3]);
 	field  = atof(argv[4]);
+	scaling = atof(argv[5]);
 	
 	/* setup initial end stops */
 	start_e = -3*pow(n,dim) - field*pow(n,dim)-1;
@@ -42,7 +44,7 @@ int main (int argc, char * argv[]) {
 	start_mag = start_mag/ pow(n,dim);
 	end_mag = end_mag /pow(n,dim);
 	mag_step = mag_step /pow(n,dim);
-	e_step = 1/pow(n,dim);
+	e_step = 1.0/pow(n,dim);
 	
 	buffer = malloc(10000*sizeof(char));
 	f = malloc(n_bins *n_bins *sizeof(double));
@@ -59,9 +61,12 @@ int main (int argc, char * argv[]) {
 			fprintf(stderr, "Couldn't get values  skipping it\n");
 			continue;
 		}
-		i = round((curr_mag - start_mag)/mag_step);
-		j = round((curr_e - start_e)/e_step);
-		f[ai(i,j,0,n_bins)] = curr_free;
+		
+		i = floorf((curr_mag - start_mag)/mag_step);
+		j = floorf((curr_e - start_e)/e_step);
+		if(j >= n_bins) j = n_bins-1;
+		if(i >=n_bins) i = n_bins -1;
+		f[ai(j,i,0,n_bins)] = curr_free;
 	}
 	fclose(map);
 	map= fopen("gradient.tsv", "w");
@@ -71,20 +76,19 @@ int main (int argc, char * argv[]) {
 	}
 	
 	
-	for(i = 0; i < (n_bins-1); i++) {
-		for (j =0; j < (n_bins-1); j++) {
+	for(i = 1; i < (n_bins-1); i+=5) {
+		for (j =1; j < (n_bins-1); j+=5) {
 		
-			de = f[ai(i,j,0,n_bins)] - f[ai(i+1,j,0,n_bins)];
-			dm = f[ai(i,j,0,n_bins)] - f[ai(i,j+1,0,n_bins)];
-			de = -de/fabs(de);
-			dm = -dm/fabs(dm);
+			de = f[ai(i-1,j,0,n_bins)] - f[ai(i+1,j,0,n_bins)];
+			dm = f[ai(i,j-1,0,n_bins)] - f[ai(i,j+1,0,n_bins)];
+			de = (de !=0)? -de/fabs(de): 0;
+			dm = (dm !=0)? -dm/fabs(dm):0;
 			
 			
-			if(f[ai(i,j,0,n_bins)]  != 0) {
-				fprintf(map, "%lf\t%lf\t%lf\t%lf\t%lf\n", start_e+i*e_step,start_mag+j*mag_step, f[ai(i,j,0,n_bins)], de/10, dm/10);
+			if(de != 0 || dm != 0) {
+				fprintf(map, "%lf\t%lf\t%lf\t%lf\n", start_e+i*e_step,start_mag+j*mag_step, de/scaling, dm/scaling);
 			}
 		}
-	
 	}
 		
 	fclose(map);

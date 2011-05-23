@@ -1220,7 +1220,7 @@ spintype * load_system(char * filename) {
 }
 
 double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
-	int i,j,k; // generic loop variables
+	int i,j,k,l;// generic loop variables
 	double *FW=NULL, *REV=NULL;
 	double ratio;
 	double B_step;
@@ -1236,7 +1236,8 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	double e_step;
 	
 	
-	double **e_hist, **m_hist;
+	
+	double **hist;
 
 	double x;
 	double * results;
@@ -1249,24 +1250,26 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	results = malloc(sizeof(double)*2);
 	M = malloc(sizeof(double)*(steps*2+2));
 	E = malloc(sizeof(double)*(steps*2+2));
-	e_hist = malloc(sizeof(double*) *(steps+1));
-	m_hist = malloc(sizeof(double*) * (steps+1));
-		
+	
+	
 	e_step = 1/pow(n,dim);
 	start_e = (-3 - B_end);
 	e_bins = round((double)(-start_e - start_e)/e_step);
+	hist = malloc(sizeof(double*) *e_bins);
+	
+		
+	e_step = 1/pow(n,dim);
+	start_e = (-3 - B_end);
+	
 	m_bins = 2/0.1;
 
 	
 	
-	for (i = 0; i <= steps; i++) {
-		e_hist[i] = malloc(sizeof(double)*e_bins);
-		m_hist[i] = malloc(sizeof(double) * m_bins);
-		for(j =0; j < e_bins; j++) {
-			e_hist[i][j] = 0;
-		}
+	for (i = 0; i < e_bins; i++) {
+		
+		hist[i] = malloc(sizeof(double) * m_bins);
 		for(j =0; j < m_bins; j++) {
-			m_hist[i][j] = 0;
+			hist[i][j] = 0;
 		}
 	}
 		
@@ -1304,9 +1307,8 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 			E[i] += energy_calc(s,n,dim,B_start+i*B_step);
 			M[i] += (sumover(s,n,dim)/pow(n,dim));
 			k = (sumover(s,n,dim)/pow(n,dim)+1)/0.1;
-			m_hist[i][k] ++;
-			k = (energy_calc(s,n,dim,B_start+i*B_step) - start_e)/e_step;
-			e_hist[i][k] ++;
+			l = (energy_calc(s,n,dim,B_start+i*B_step) - start_e)/e_step;
+			hist[l][k] ++;
 			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
 		//	fprint_map(s,n,dim,buffer);
 		}
@@ -1343,22 +1345,15 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	}
 	fclose(outr);
 	fclose(out);
-	sprintf(buffer,"./Mag-Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
-	out = fopen(buffer, "w");
-	for( i =0; i <= steps; i ++) {
-		for (j = 0; j < m_bins; j++) {
-			fprintf(out, "%lf\t%lf\t%lf\n", E[i], -1+0.1*j, m_hist[i][j]);
-		}
-	}
-	fclose(out);
-	sprintf(buffer,"./E-Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	sprintf(buffer,"./Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
 	out = fopen(buffer, "w");
 	
 	printf("%d \n", e_bins);
-	for( i =0; i <= steps; i ++) {
-		for (j = 0; j < e_bins; j++) {
-			fprintf(out, "%lf\t%lf\t%lf\n", M[i], start_e+e_step*j, e_hist[i][j]);
+	for( i =0; i <e_bins; i ++) {
+		for (j = 0; j < m_bins; j++) {
+			fprintf(out, "%lf\t%lf\t%lf\n", -1+0.1*j, start_e+e_step*i, hist[i][j]);
 		}
+		fprintf(out,"\n");
 	}
 	fclose(out);
 	

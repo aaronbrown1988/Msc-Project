@@ -18,6 +18,10 @@ all: wang wangmpi ising_gen
 
 dosmanip: dos-manip.o isinglib2.o
 	$(LD) -o $(BIN)/dos-manip dos-manip.o isinglib2.o $(LDFLAGS)
+
+gradient: gradient.o isinglib2.o
+	$(LD) -o $(BIN)/gradient gradient.o isinglib2.o $(LDFLAGS)
+
 ising_gen: isinglib2.o ising_gen.o
 	$(LD) -o $(BIN)/ising_gen ising_gen.o isinglib2.o $(LDFLAGS)
 
