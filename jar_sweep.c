@@ -16,8 +16,10 @@ int main(int argc, char *argv[]) {
 	char buffer[1000];
 	coupling = coupl;
 	i = 0.075;
+	int done=0;
+	double wall=48;
 	
-	if (argc != 11) {
+	if (argc != 13) {
 		fprintf(stderr, "Not enough args\n");
 		exit(EXIT_FAILURE);
 	}
@@ -32,13 +34,15 @@ int main(int argc, char *argv[]) {
 	b_end = atof(argv[8]);
 	iterations = atoi(argv[9]);
 	steps = atoi(argv[10]);
+	done = atoi(argv[11]);
+	wall = atof(argv[12]);
 	sprintf(buffer, "jar_sweep-%d-%d-%g-%g-%g-%g-%g-%g", n,dim, t_start,t_step,t_end,b_start,b_step,b_end);
 	output = fopen(buffer, "w");
 	s = setup(2,n,dim);
 	for (i = t_start; i < t_end; i+= t_step) {
 		for(j = b_start; j< b_end; j+= b_step) {
 			
-			results = jarzinski(s,n,dim,i,j,j+b_step,iterations,steps);
+			results = jar_eff(s,n,dim,i,j,j+b_step,iterations,steps,done,wall);
 			fprintf(output, "%g\t%g\t%g\t%g\t%g\n", i,j,results[0], results[1], results[2]);
 			fflush(output);
 			free(results);

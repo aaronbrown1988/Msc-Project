@@ -51,15 +51,16 @@ int main(int argc, char * argv[]) {
 
 	double *recv;
 
-	if	(argc < 5) {
-		fprintf(stderr, "USAGE wangmpi WALL size dim thresh \n");
+	if	(argc < 6) {
+		fprintf(stderr, "USAGE wangmpi WALL size dim thresh bin_size\n");
 		exit(EXIT_FAILURE);
 	}
 	
+	wall = 3600*atof(argv[1]);
 	n = atoi(argv[2]);
 	dim = atoi(argv[3]);
-	wall = 3600*atof(argv[1]);
 	threshold = atof(argv[4]);
+	bin_size = atof(argv[5]);
 	//wall = 120;
 	t1 = clock();
 	
@@ -229,7 +230,7 @@ int main(int argc, char * argv[]) {
 					fprintf(out, "#E\tM\tVal\n");
 					for (i = 0; i < n_bins; i ++) {
 						for(j = 0; j < n_bins; j ++) {
-							fprintf(out, "%g\t%g\t%g\n", start_energy+i, start_mag+j*mag_step, g_e[ai(i,j,0,n_bins)]);
+							fprintf(out, "%g\t%g\t%g\n", start_energy+i*bin_size, start_mag+j*mag_step, g_e[ai(i,j,0,n_bins)]);
 						}
 					fprintf(out,"\n");
 					}
@@ -296,7 +297,7 @@ int main(int argc, char * argv[]) {
 	memmove((void*)g_e, (void*)recv, sizeof(double)*n_bins*n_bins);
 	free(recv);
 	ge_min = INT_MAX;
-	error = fabs((g_e[ai(0, start_mag/mag_step, 0, n_bins)] - g_e[ai(n_bins, start_mag/mag_step, 0, n_bins)])/log(2));
+	//error = fabs((g_e[ai(0, start_mag/mag_step, 0, n_bins)] - g_e[ai(n_bins, start_mag/mag_step, 0, n_bins)])/log(2));
 	for(i = 0; i < n_bins*n_bins; i ++)
 		if (g_e[i] > 0) 
 			ge_min = min(ge_min, g_e[i]);

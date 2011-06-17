@@ -20,10 +20,10 @@ while ($line = readline(DATA)) {
 	@vals = [];
 	@vals = split(/\t/, $line);
 	if ($vals[2] > 0) {
-		$vals[0] /= (14*14);
+		$vals[0] /= (12*12);
 		$vals[2] -= $min;
 		#$vals[1] -= (14*14);
-		$vals[1] /= (14*14);
+		$vals[1] /= (12*12);
 		push(@energy, $vals[0]);
 		push(@mag, $vals[1]);
 		push(@dos, $vals[2]);

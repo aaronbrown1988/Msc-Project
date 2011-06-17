@@ -19,8 +19,8 @@ while ($file  = readdir(DIR)) {
 			if ($vals[2] > 0) {
 				$vals[2] -= $min;
 				#$vals[1] -= (12*12*12);
-				$vals[1] /= (14*14);#*14);
-				$vals[0] /= (14*14);#*14);
+				#$vals[1] /= (12*12);#*14);
+				$vals[0] /= (12*12);#*14);
 				print DOUT "$vals[0]\t$vals[1]\t$vals[2]\n";
 				if ($old  != $vals[0]) {
 					print DOUT "\n";

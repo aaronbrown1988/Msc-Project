@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -20,7 +21,7 @@ void accumulate(spintype *ac, spintype *s, int n, int dim) {
 
 
 int main(int argc, char *argv[]) {
-	int i,j,k; // generic loop variables
+	int i,j; // generic loop variables
 	spintype *s, *accum;
 	double *FW=NULL, *REV=NULL;
 	double T,ratio;
@@ -32,8 +33,10 @@ int main(int argc, char *argv[]) {
 	double steps;
 	double alpha, dF;
 	double coupl[4] = {1,1,1,1};
+	int completed = 0;
 	char buffer[1000];
 	FILE * out;
+	FILE * in;
 
 	coupling = coupl;
 	/* process command line arguments */
@@ -47,6 +50,8 @@ int main(int argc, char *argv[]) {
 	B_end = atof(argv[3]);
 	runs = atoi(argv[4]);
 	steps = atoi(argv[5]);
+	if (argc > 6) 
+		completed = atoi(argv[6]);
 	
 		
 	//Setup system;
@@ -71,10 +76,17 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-
-	for(i =0; i < runs; i++) {
-		FW[i] =0; 
-		REV[i]=0;
+	if (completed == 0) {
+		for(i =0; i < runs; i++) {
+			FW[i] =0; 
+			REV[i]=0;
+		}
+	} else {
+		in = fopen("FW.bin", "rb");
+		fread(FW, sizeof(double), runs, in);
+		fclose(in);
+		in = fopen("REV.bin", "rb");
+		fread(REV, sizeof(double), runs, in);
 	}
 	
 	sprintf(buffer, "jar-%g-%g-%g-%d-%g-out",T,B_start, B_end, runs,steps);
@@ -82,9 +94,9 @@ int main(int argc, char *argv[]) {
 	mkdir(buffer, S_IRUSR | S_IWUSR | S_IXUSR);
 	chdir(buffer);
 	
-	sprintf(buffer,"./fwd.tsv", j);
+	sprintf(buffer,"./fwd.tsv");
 	out = fopen(buffer, "w");
-	for(j =0; j < runs; j++) {
+	for(j =completed; j < runs; j++) {
 		/* Forward */
 		//Randomize spins
 		initSpins(s,n,dim);
@@ -104,7 +116,7 @@ int main(int argc, char *argv[]) {
 	sprintf(buffer, "./map-fwd.tsv");
 //	fprint_map(accum,n,dim,buffer);
 
-	sprintf(buffer,"./rev.tsv", j);
+	sprintf(buffer,"./rev.tsv");
 	out = fopen(buffer, "w");
 
 	for(j =0; j < runs; j++) {

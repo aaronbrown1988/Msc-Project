@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <string.h>
 #include <float.h>
+#include <time.h>
 
 
 
@@ -1219,7 +1220,7 @@ spintype * load_system(char * filename) {
 	return(s);
 }
 
-double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps) {
+double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps, int done, double wall) {
 	int i,j,k,l;// generic loop variables
 	double *FW=NULL, *REV=NULL;
 	double ratio;
@@ -1232,15 +1233,18 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	double *M, *E;
 	FILE * out;
 	FILE *outr;
+	FILE *bin;
 	double start_e;
 	double e_step;
-	
-	
-	
+	clock_t t1, t2;
+	t1 = clock();
+	wall = wall *3600;
 	double **hist;
 
 	double x;
 	double * results;
+
+
 
 	B_step = (B_end - B_start)/steps;
 	
@@ -1279,12 +1283,19 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		exit(EXIT_FAILURE);
 	}
 
-
-	for(i =0; i < runs; i++) {
-		FW[i] =0; 
-		REV[i]=0;
+	if(done == 0) {
+		for(i =0; i < runs; i++) {
+			FW[i] =0; 
+			REV[i]=0;
+		}
+	} else {
+		bin = fopen("FW.bin", "rb");
+		fread(FW, sizeof(double), runs, bin);
+		fclose(bin);
+		bin = fopen("REV.bin", "rb");
+		fread(REV, sizeof(double), runs, bin);
+		fclose(bin);
 	}
-	
 	for(i =0; i < 2*steps; i++) {
 		M[i] =0;
 		E[i] = 0;
@@ -1294,11 +1305,23 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	out = fopen(buffer, "w");
 	sprintf(buffer,"./%g-B%g-%g-rev.tsv", T,B_start, B_end );
 	outr = fopen(buffer, "w");
-	for(j =0; j < runs; j++) {
+	for(j =done; j < runs; j++) {
 		/* Forward */
 		//Randomize spins
 		initSpins(s,n,dim);
-		
+		t2 = clock();
+		if(((t2-t1)/CLOCKS_PER_SEC) > 0.9*wall) {
+			/*Out of time */
+			bin = fopen("FW.bin", "wb");
+			fwrite(FW, sizeof(double), runs, bin);
+			fclose(bin);
+			bin = fopen("REV.bin", "wb");
+			fwrite(REV, sizeof(double), runs, bin);
+			fclose(bin);
+			fprintf(stderr, "runs completed: %d\n Called with: n:%d dim:%d\nB: %lf - %lf\nruns:%d\nsteps: %d\ndone: %d\nwall: %lf\n", j,n,dim,B_start, B_end, runs,steps,done,wall);
+			exit(1);
+		}
+			
 		metropolis(s,n,dim, 1e4, T, &ratio, B_start);
 		
 		for (i =0; i <= steps; i ++) {
@@ -1348,7 +1371,7 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	sprintf(buffer,"./Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
 	out = fopen(buffer, "w");
 	
-	printf("%d \n", e_bins);
+	//printf("%d \n", e_bins);
 	for( i =0; i <e_bins; i ++) {
 		for (j = 0; j < m_bins; j++) {
 			fprintf(out, "%lf\t%lf\t%lf\n", -1+0.1*j, start_e+e_step*i, hist[i][j]);
@@ -1418,6 +1441,241 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 		
 	return(results);
 }	
+
+double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps, int done, double wall) {
+	int i,j,k,l;// generic loop variables
+	double *FW=NULL, *REV=NULL;
+	double ratio;
+	double B_step;
+	double dWf, dWr;
+	double P,WR,WF;
+	double alpha, dF;
+	char buffer[1000];
+	int e_bins,m_bins;
+	double *M, *E;
+	FILE * out;
+	FILE *outr;
+	FILE *bin;
+	double start_e;
+	double e_step;
+	clock_t t1, t2;
+	t1 = clock();
+	wall = wall *3600;
+	double **hist;
+	spintype *fwd_start, *end_start;
+
+	double x;
+	double * results;
+	
+	B_step = (B_end - B_start)/steps;
+	
+	FW = malloc(sizeof(double)*runs);
+	REV = malloc(sizeof(double) *runs);
+	
+	results = malloc(sizeof(double)*2);
+	M = malloc(sizeof(double)*(steps*2+2));
+	E = malloc(sizeof(double)*(steps*2+2));
+	
+	fwd_start = malloc(sizeof(spintype)*pow(n,dim));
+	end_start = malloc(sizeof(spintype)*pow(n,dim));
+	
+	
+	e_step = 1/pow(n,dim);
+	start_e = (-3 - B_end);
+	e_bins = round((double)(-start_e - start_e)/e_step);
+	hist = malloc(sizeof(double*) *e_bins);
+	
+		
+	e_step = 1/pow(n,dim);
+	start_e = (-3 - B_end);
+	
+	m_bins = 2/0.1;
+
+	
+	
+	for (i = 0; i < e_bins; i++) {
+		
+		hist[i] = malloc(sizeof(double) * m_bins);
+		for(j =0; j < m_bins; j++) {
+			hist[i][j] = 0;
+		}
+	}
+		
+	
+	if (!FW || !REV) {
+		fprintf(stderr, "Couldn't allocate work done bins\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if(done == 0) {
+		for(i =0; i < runs; i++) {
+			FW[i] =0; 
+			REV[i]=0;
+		}
+	} else {
+		bin = fopen("FW.bin", "rb");
+		fread(FW, sizeof(double), runs, bin);
+		fclose(bin);
+		bin = fopen("REV.bin", "rb");
+		fread(REV, sizeof(double), runs, bin);
+		fclose(bin);
+	}
+	for(i =0; i < 2*steps; i++) {
+		M[i] =0;
+		E[i] = 0;
+	}
+	
+	sprintf(buffer,"./%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	out = fopen(buffer, "w");
+	sprintf(buffer,"./%g-B%g-%g-rev.tsv", T,B_start, B_end );
+	outr = fopen(buffer, "w");
+	
+	/*equilibriate systems */
+	initSpins(s,n,dim);
+	metropolis(s,n,dim, 1e5, T, &ratio, B_start);
+	memcpy(fwd_start, s, sizeof(spintype)*pow(n,dim));
+	initSpins(s,n,dim);
+	metropolis(s,n,dim, 1e5, T, &ratio, B_end);
+	memcpy(end_start, s, sizeof(spintype)*pow(n,dim));
+	
+	printf("Equilibriation runs finished\n");
+	for(j =done; j < runs; j++) {
+		/* Forward */
+		//Randomize spins
+		metropolis(fwd_start,n,dim, 10, T, &ratio, B_start);
+		memcpy(s,fwd_start, sizeof(spintype)*pow(n,dim));
+		t2 = clock();
+		if(((t2-t1)/CLOCKS_PER_SEC) > 0.95*wall) {
+			/*Out of time */
+			bin = fopen("FW.bin", "wb");
+			fwrite(FW, sizeof(double), runs, bin);
+			fclose(bin);
+			bin = fopen("REV.bin", "wb");
+			fwrite(REV, sizeof(double), runs, bin);
+			fclose(bin);
+			fprintf(stderr, "runs completed: %d\n Called with: n:%d dim:%d\nB: %lf - %lf\nruns:%d\nsteps: %d\ndone: %d\nwall: %lf\n", j,n,dim,B_start, B_end, runs,steps,done,wall);
+			exit(1);
+		}
+			
+		
+		
+		for (i =0; i <= steps; i ++) {
+			FW[j] += -sumover(s,n,dim)*B_step;
+			metropolis(s,n,dim,1,T,&ratio,B_start+i*B_step);
+			E[i] += energy_calc(s,n,dim,B_start+i*B_step);
+			M[i] += stripe_order(s,n,dim);//(sumover(s,n,dim)/pow(n,dim));
+			k = (sumover(s,n,dim)/pow(n,dim)+1)/0.1;
+			l = (energy_calc(s,n,dim,B_start+i*B_step) - start_e)/e_step;
+			hist[l][k] ++;
+			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
+		//	fprint_map(s,n,dim,buffer);
+		}
+		//fclose(out);
+		/*Reverse */
+		metropolis(end_start,n,dim, 10, T, &ratio, B_end);
+		memcpy(s,end_start, sizeof(spintype)*pow(n,dim));
+		
+		for (i =0; i <= steps; i++) {
+			REV[j] += sumover (s,n,dim) * B_step;
+			metropolis(s,n,dim,1,T,&ratio, B_end - i *B_step);
+			E[steps+i+1] += energy_calc(s,n,dim,B_end-i*B_step);
+			M[steps+i+1] += stripe_order(s,n,dim);//(sumover(s,n,dim)/pow(n,dim));
+			x=sumover(s,n,dim)/pow(n,dim);
+			if(x > 1) {
+				printf("Got mag of %lf on step %d of run %d\n", x,i,j);
+			}
+			//fflush(out);
+			sprintf(buffer, "./map-rev-%07d-%07d.tsv", j,i);
+			//	fprint_map(s,n,dim,buffer);
+		}
+		
+		
+	}
+	
+	for(i =  0; i <= steps; i++) {
+		M[i] = M[i]/runs;
+		E[i] = E[i]/runs;
+		M[steps+i+1] = M[steps+i+1]/runs;
+		E[steps+i+1] = E[steps+i+1]/runs;
+		
+		fprintf(out, "%d\t%g\t%g\t%g\n", i, M[i], E[i], B_start+i*B_step);
+		fprintf(outr, "%d\t%g\t%g\n", i, M[steps+i+1], E[steps+i+1]);
+	}
+	fclose(outr);
+	fclose(out);
+	sprintf(buffer,"./Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
+	out = fopen(buffer, "w");
+	
+	//printf("%d \n", e_bins);
+	for( i =0; i <e_bins; i ++) {
+		for (j = 0; j < m_bins; j++) {
+			fprintf(out, "%lf\t%lf\t%lf\n", -1+0.1*j, start_e+e_step*i, hist[i][j]);
+		}
+		fprintf(out,"\n");
+	}
+	fclose(out);
+	
+	
+	
+	WF = 0;
+	WR = 0;
+	for (j =0; j<runs; j ++) {
+		WF += FW[j];
+		WR += REV[j];
+	}
+	
+	WF = WF/runs;
+	WR = WR/runs;
+	
+	dWf = 0;
+	dWr = 0;
+	for (j =0; j < runs; j++) {
+		dWf += pow(FW[j] - WF,2);
+		dWr += pow(REV[j] - WR,2);
+	}
+	
+	dWf = sqrt(dWf/(runs *(runs-1)));
+	dWr = sqrt(dWr/(runs *(runs-1)));
+	
+	dWf = dWf * sqrt(runs);
+	dWr = dWr * sqrt(runs);
+	
+	sprintf(buffer, "out-curves-%g-%g.tsv",T,B_start);
+	out = fopen(buffer, "w");
+		for (i =0; i < runs; i ++) {
+		P = exp(-pow(FW[i] - WF,2)/(2*dWf*dWf))/(sqrt(2*M_PI)*dWf);
+		fprintf(out, "%lf\t%lf", FW[i], P);
+		fflush(out);
+		P = exp(-pow(REV[i] - WR,2)/(2*dWr*dWr))/(sqrt(2*M_PI)*dWr);
+		fprintf(out, "\t%lf\t%lf\n", REV[i], P);
+		fflush(out);
+	}
+	
+	
+	alpha = dWf/dWr;
+	dF = (WF - alpha*alpha *WR - sqrt( alpha *alpha*pow(WF - WR,2)-2*(1-alpha*alpha)*dWf*dWf*log(alpha)))/(1-alpha*alpha);
+//	printf("dF: %g\n", dF);
+	results[0] = dF;
+	dF =0;
+	for(i=0; i < runs; i++) {
+		dF += exp(FW[i]/T);
+	}
+	dF = -T*log(dF/runs);
+	results[1] = dF;
+	dF =0;
+	for(i=0; i < runs; i++) {
+		dF += exp(REV[i]/T);
+	}
+	dF = -T*log(dF/runs);
+	results[2] = dF;
+	fprintf(out, "#results[] = %g \t %g \t%g\n", results[0], results[1], results[2]);
+	fflush(out);
+	fcloseall();
+	free(FW);
+	free(REV);
+		
+	return(results);
+}
 
 void glauber(spintype *s, int n, int dim, long int flips, double temperature, double * ratio, double field) {
 	int i,j,k;
@@ -1519,8 +1777,322 @@ double  thermal_integration(spintype *s, int n, int dim, double T, double B_star
 	
 	return(dF);
 }
+
+
+double stripe_order(spintype *s, int n, int dim) {
+	int i,j;
+	double A,B,C; // Stripes in primary 2D lattice directions.
+	if (dim != 2 ) {
+		fprintf(stderr, "Non 2D systems not implemented yet :(\n");
+		return (-1);
+	}
+	
+	for (i =0; i < n; i ++) {
+		for (j=0; j<n; j++) {
+			A += s[ai(i,j,0,n)].s * pow(-1,ai(i,j,0,n));
+			C += s[ai(i,j,0,n)].s * pow(-1,j);
+			B += s[ai(i,j,0,n)].s * pow(-1, fabs(i-j));
+		}
+	}
+	A = fabs(A/pow(n,dim));
+	B = fabs(B/pow(n,dim));
+	C = fabs(C/pow(n,dim));
+	
+	return( (A<B)? (B<C)? B:C:(A<C)?C:A );
+	
+}
+
+
+double * wang_stripe(spintype *s, int n, int dim, double field, int *n_bin, double *g_e, double f, double threshold) {
+	double bin_size =1; 
+	int n_bins;
+	int site, j,i;
+	long long int steps =0;
+	double E;
+	double eta,r;
+	int gE1, gE2;
+	double end_energy;
+	double start_energy;
+	int flat=0;
+	double avg;
+	int *visit;
+	int n_avg;
+	double ge_min = 1000;
+	int old_site = n*n*n*n*n;
+	//double norm=0;
+	double start_stripe, end_stripe;
+	double stripe_step;
+	int m1, m2;
+	int v_min;
+	FILE *out;
+	char buffer[100];
+	
+	
+	start_energy = -(s[0].n_neigh/2)*pow(n,dim)-pow(n,dim)*field-1;
+	end_energy = (s[0].n_neigh/2)*pow(n,dim)+pow(n,dim)*field+1;
+	
+	start_stripe = 0;
+	end_stripe = 1.1;
+	
+	
+	
+	n_bins = abs((end_energy - start_energy)/bin_size + 0.5) +1;
+	stripe_step = (end_stripe - start_stripe)/n_bins;
+	
+	*n_bin = n_bins;
+	
+	if (f == 1) {
+		fprintf(stderr, "starting from scratch\n");
+		g_e = malloc(sizeof(double)*n_bins*n_bins);
+	} else {
+		ge_min = DBL_MAX;
+	}
+	visit = malloc(sizeof(int)*n_bins*n_bins);
+	
+	if (g_e == NULL || visit == NULL ) {
+		fprintf(stderr, "wang2: Couldn't get memory for histograms\n");
+		exit(1);
+	}
+	
+	for (i = 0; i < n_bins*n_bins; i++) {
+		//Initialise Bins
+		if(f==1) {
+			g_e[i] = 0.0;
+		}
+		visit[i] = 0;
+	}
+	
+	E = energy_calc(s, n, dim, field) * pow(n,dim);
+	gE1 = E - start_energy;
+	gE1 /= bin_size;
+	gE1 = round(gE1);
+	m1 = abs(round((stripe_order(s,n,dim))/stripe_step));
+	while (f > threshold) {
+		//Find G(E1)
+		
+		site = round((double)(pow(n,dim) * (double) rand())/RAND_MAX);
+		if (site == old_site) {
+			//printf("Got site %d again\n", site);
+			//continue;
+		}
+		old_site = site;
 		
 		
+		
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE1, start_energy+(gE1*bin_size), start_energy+((gE1+1)*bin_size));
+		// Flip spin and get G(E2)
+		s[site].s = -s[site].s;
+		E = energy_calc(s, n, dim, field)* pow(n,dim);
+		gE2 = E;
+		gE2 = E - start_energy ;
+		gE2 /= bin_size;
+		gE2 = round(gE2);
+		//printf("E: %lf in bin %d, lb %lf ub %lf\n", E, gE2, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+		//break;
+		
+		m2 = abs(round(stripe_order(s,n,dim)/stripe_step));
+		
+		
+		if ( gE2 < 0 || gE1 < 0 || gE1 > n_bins || gE2 > n_bins || m1 > n_bins || m2 > n_bins || m1 < 0 || m2<0 || ai(gE2, m2,0,n_bins) > (n_bins*n_bins)) {
+			printf ("GE1: %d Ge2: %d\n", gE1, gE2);
+			printf("E: %lf in bin %d/%d, lb %lf ub %lf\n", E, gE2,n_bins, start_energy+(gE2*bin_size), start_energy+((gE2+1)*bin_size));
+			printf ("m1: %d m2: %d\n", m1,m2);
+			printf("M: %lf in bin %d/%d, lb %lf ub %lf\n", stripe_order(s,n,dim), m2,n_bins, (m2*stripe_step), (m2+1)*stripe_step);
+			printf("Goes to linear bin number %d/%d\n", ai(gE2,m2,0,n_bins), n_bins*n_bins);
+			printf("Found an invalid bin\n");
+			exit(1);
+		}
+		
+					
+		eta = g_e[ai(gE1, m1,0, n_bins)] - g_e[ai(gE2, m2,0, n_bins)];
+		
+		r = (double) rand()/RAND_MAX;
+		
+		if (ge_min <=0) {
+			printf("WHOA!!! ge_min == 0\n");
+			exit(1);
+		}
+		
+		/* Check to see if we hit a new bin*/
+		if(g_e[ai(gE2,m2,0,n_bins)] == 0) {
+			for (i = 0; i < n_bins*n_bins; i++)
+				visit[i] = 0;
+			g_e[ai(gE2,m2,0,n_bins)] = ge_min; // makes sense but need to find reasoning
+		}
+		
+		
+		if (r <= exp(eta)  || g_e[ai(gE2, m2,0, n_bins)] < g_e[ai(gE1,m1,0,n_bins)]) {
+			// Flip Accepted;
+			g_e[ai(gE2, m2,0, n_bins)] += f;
+			ge_min = (g_e[ai(gE2, m2,0, n_bins)] < ge_min  && g_e[ai(gE2, m2,0, n_bins)] != 0)?  g_e[ai(gE2, m2,0, n_bins)]: ge_min;
+			visit[ai(gE2, m2,0, n_bins)] += 1;	
+			gE1 = gE2;
+			m1 = m2;		
+		} else {
+			// Flip the Spin back
+			s[site].s = -s[site].s;
+			visit[ai(gE1, m1, 0,n_bins)] += 1;
+			g_e[ai(gE1, m1,0, n_bins)] += f;
+			ge_min = (g_e[ai(gE1, m1,0, n_bins)] < ge_min && g_e[ai(gE1, m1,0, n_bins)] != 0)?  g_e[ai(gE1, m1,0, n_bins)]: ge_min;
+			
+		}
+		
+		steps++;
+		/* decide if the histogram is flat */
+
+		if (steps%100000 == 0) {
+			avg = 0;
+			n_avg = 0;
+			DEBUGLINE printf("MCS: %lld Checking Flatness...\n", steps);
+			flat = 1;
+			v_min = INT_MAX;
+			for(i = 0; i < n_bins*n_bins; i++) {
+				if(visit[i] != 0) {
+					avg += visit[i];
+					v_min = ((v_min > visit[i]) && (visit[i] != 0))? visit[i]:v_min;
+					n_avg ++;
+				} 
+			}
+			avg /= (double) n_avg;
+			if (n_avg <= 2) {
+				flat = 0;
+				continue;
+			}
+			DEBUGLINE printf("v_min: %d n_avg: %d criteria: %lf\n", v_min, n_avg, (0.80*avg));			
+			if((v_min > (0.80*avg)) && avg != 0) {
+			DEBUGLINE	printf("Yes!\n");
+				f = f*0.5;
+				flat = 0;
+				printf("MCS: %lld Histogram is Flat\nMoving to F=%lf\n", steps, f);
+				
+				/* Save out Histogram */
+				sprintf(buffer, "Hist-%lf-%dx%d-%g.tsv", f,n,dim,field);
+				out = fopen(buffer, "w");
+				fprintf(out, "#E\tM\tVal\n");
+				for (i = 0; i < n_bins; i ++) {
+					for(j = 0; j < n_bins; j ++) {
+						fprintf(out, "%g\t%g\t%g\n", (start_energy+i*bin_size), (j*stripe_step), g_e[ai(i,j,0,n_bins)]);
+					}
+					fprintf(out,"\n");
+				}
+				fclose(out);
+				
+				
+				
+				
+				if (f <= threshold) {
+					for(j =0; j < n_bins; j++) {
+						for (i=0; i < n_bins; i++) {
+							if(g_e[ai(i,j,0,n_bins)]!=0)
+							printf("%lf\t%lf\t%lf\n", (start_energy+i*bin_size),j*stripe_step, g_e[ai(i,j,0,n_bins)]);
+						}
+						//printf("\n");
+					}
+				}
+				for(i=0; i < n_bins*n_bins; i ++)
+						visit[i] = 0;		
+			}
+		}
+	}
+	for(i=0; i < n_bins*n_bins; i ++) {
+		if(isnan(g_e[i])) {
+			printf("wang2: bin %d is nan\n", i);
+			exit(EXIT_FAILURE);
+		}
+	}
+				
+	return(g_e);
+}
 	
 	
 	
+double * loadDos(int n, int dim, char *filename) {
+	FILE *snap=NULL;
+	int i,j,k;
+	int n_bins;
+	double *dos;
+	double E,M;
+	double temp1,temp2,temp3;
+	char buffer[1000];
+	double gmin;
+	double gmax;
+	double start_mag, mag_step, end_mag;
+	double start_energy, end_energy,bin_size = 1;
+	int ebin, mbin, wbins;
+	start_energy = INT_MAX;
+	end_energy = -INT_MAX;
+	start_mag = INT_MAX;
+	end_mag = - INT_MAX;
+	gmin = INT_MAX;
+	gmax = -INT_MAX;
+	
+	snap = fopen(filename, "r");
+	if (snap == NULL) {
+		printf("Couldn;t open %s\n", filename);
+		exit(1);
+	}
+	i =0;
+	
+	while (!feof(snap)) {
+		fgets(buffer,1000,snap);
+		sscanf(buffer, "%lf\t%lf\t%lf", &temp1, &temp2,&temp3);
+		start_energy = (start_energy > temp1)? temp1: start_energy;
+		end_energy = (end_energy < temp1)? temp1: end_energy;
+		start_mag = (start_mag > temp2)? temp2: start_mag;
+		end_mag = (end_mag < temp2)? temp2: end_mag;
+		i++;
+	}
+	//i = sqrt(i);
+	i = i-2;
+	n = sqrt(sqrt(i));
+	dos = malloc(i * sizeof(double));
+	rewind(snap);
+	fgets(buffer,1000,snap);
+	n_bins = end_energy - start_energy;
+	mag_step = (end_mag - start_mag)/n_bins;
+	
+	if (n_bins != sqrt(i)) {
+		printf("n_bins %d != %lf\n", n_bins, sqrt(i));
+		//exit(1);
+	}
+	while(!feof(snap)) {
+		
+		k = fscanf(snap, "%lf\t%lf\t%lf\n", &temp1, &temp2,&temp3);
+		if (k != 3) {
+			printf("Read failed only got %d from scanf\n", k);
+			exit(1);
+			
+		}
+		temp1 = temp1 - start_energy;
+		i = (int) round(temp1);
+		
+		temp2 = (temp2 - start_mag)/mag_step;
+		j = (int) round(temp2);
+		//printf("%lf=> %d %lf => %d\n", temp1,i,temp2,j);
+		dos[ai(i,j,0,n_bins)] = temp3;
+		gmin = ((temp3 != 0) && (temp3 < gmin))? temp3:gmin;
+		gmax = ((temp3 != 0) && (temp3 > gmax))? temp3:gmax;
+	}
+
+	start_energy /= (12*12); // *12);
+	end_energy /= (12*12); // *12);
+	bin_size /= (12*12); // *12);
+
+	fclose(snap);
+	
+	
+	/* Normalize DOS*/
+	
+	for(i=0; i < n_bins; i++) {
+		for(j =0; j < n_bins; j++) {
+			if(dos[ai(i,j,0,n_bins)] > 0) {
+				dos[ai(i,j,0,n_bins)] = dos[ai(i,j,0,n_bins)]- gmin;
+			}
+		}
+	}
+		
+	printf("gmin: %lf\n", gmin);
+	gmax -= gmin;
+	//gmax =0;
+	return(dos);
+}

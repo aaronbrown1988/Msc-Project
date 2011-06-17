@@ -7,9 +7,9 @@ BIN=../bin
 
 # compilers etc
 CC=gcc
-CFLAGS=-O3 -pg -g
+CFLAGS=-pg -g #-O3
 LD=gcc
-LDFLAGS=-lm -O3 -pg -g
+LDFLAGS=-lm -pg -g#-O3
 
 # List of object files needed to build program
 OBJECTS=isinglib2.o wangmpi.o wang1D.o ising_gen.o ising_error.o ising_temp.o ising_mag.o ising_dbg.o WL-post.o
@@ -36,6 +36,9 @@ WL-post: isinglib2.o WL-post.o
 
 wang: isinglib2.o wang.o
 	$(LD) -o $(BIN)/wang wang.o isinglib2.o $(LDFLAGS)
+
+wang_stripe: isinglib2.o wang_stripe.o
+	$(LD) -o $(BIN)/wang_stripe wang_stripe.o isinglib2.o $(LDFLAGS)
 
 jar_sweep: isinglib2.o jar_sweep.o
 	$(LD) -o $(BIN)/jar_sweep jar_sweep.o isinglib2.o $(LDFLAGS)
