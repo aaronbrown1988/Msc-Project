@@ -89,7 +89,7 @@ int main(int argc, char * argv[]) {
 	
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 	if(my_rank ==0) 
-		printf("Got %d processors \n", world_size);
+		printf("#Got %d processors \n", world_size);
 	
 	Es = malloc(sizeof(double)*T_todo);
 	Ts = malloc(sizeof(double)*T_todo);
@@ -207,7 +207,7 @@ int main(int argc, char * argv[]) {
 			printf("%lf\t%lf\n", T_out[i], E_out[i]);
 		}
 	
-		printf("%d: My ratio was: %lf\n", my_rank, (double)swap_success/swap_attempts);
+		printf("#%d: My ratio was: %lf\n", my_rank, (double)swap_success/swap_attempts);
 	
 	
 	

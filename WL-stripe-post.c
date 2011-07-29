@@ -171,14 +171,14 @@ int main(int argc, char *argv[]) {
 
 			for (j=0; j<n_bins; j++) {
 				for(k=0; k < n_bins; k++) {
-					if(dos[ai(j,k,0,n_bins)]  > 0) {
+					if(dos[ai(k,j,0,n_bins)]  > 0) {
 //						if ((start_energy2+k*bin_size) != hold) { - Taken out and swapped for line below in inverting loops
 						if ((start_mag+j*mag_step) != hold) {
 							fprintf(FL,"\n");
 //							hold = (start_energy2+k*bin_size);
 							hold = (start_mag+j*mag_step);
 						}
-						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy+k*bin_size),(start_mag+j*mag_step),(start_energy+k*bin_size)-temp1*dos[ai(j,k,0,n_bins)]); // -(start_mag+j*mag_step)*0.1*i
+						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy+k*bin_size),(start_mag+j*mag_step),(start_energy+k*bin_size)-temp1*dos[ai(k,j,0,n_bins)]); // -(start_mag+j*mag_step)*0.1*i
 					
 						
 					}

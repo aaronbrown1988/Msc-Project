@@ -26,7 +26,8 @@ do
 		do
 			echo "$j"
 			T=`echo "$j" | sed -e 's/out-curves-//;' | sed -e 's/-.*//;'`
-			echo "set terminal postscript enhanced color; set output\"$OUTDIR/$i-$j.eps\"; set title \"Crooks curves for $i steps at $T\"; set xlabel \"W\"; set ylabel \"ln(W)-(1/T)*W\"; p \"$j\" u 1:(\$2 + (1/0.075)*0.5*\$1) ti \"Forward\" ,\"$j\" u (-\$3) :(\$4 + (1/0.075)*0.5*\$3) ti \"Reverse\" ;" | gnuplot; 
+			# The plus in the second plot is correct. Despite what you currently think. LEAVE IT BE.
+			echo "set terminal postscript enhanced color; set output\"$OUTDIR/$i-$j.eps\"; set title \"Crooks curves for $i steps at $T\"; set xlabel \"W\"; set ylabel \"ln(W)-(1/T)*W\"; p \"$j\" u 1:(log(\$2) + (1/0.075)*0.5*\$1) ti \"Forward\" ,\"$j\" u (-\$3):(log(\$4) + (1/0.075)*0.5*\$3) ti \"Reverse\" ;" | gnuplot; 
 		done 
 		cd ..
 	fi

@@ -51,7 +51,7 @@ int main(int argc, char * argv[]) {
 		f = atof(argv[3]);
 	}
 		
-	results = wang2(s,n,dim ,B, &n_bins, g_e, f, 1e-2);
+	results = wang_stripe(s,n,dim ,B, &n_bins, g_e, f, 1e-8);
 	
 	SAVE = fopen("./dos.bin", "wb");
 	ret_val = fwrite(results, sizeof(double), (n_bins+1)*(n_bins+1), SAVE);

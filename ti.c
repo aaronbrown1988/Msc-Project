@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 	double i,j,k;
 	double t_start, t_end,t_step;
 	double b_start, b_end, b_step;
-	double * results;
+	double  results;
 	double coupl[4] = {1,1,1,-1};
 	FILE * output;
 	char buffer[1000];
@@ -41,9 +41,9 @@ int main(int argc, char *argv[]) {
 	for (i = t_start; i < t_end; i+= t_step) {
 		for(j = b_start; j< b_end; j+= b_step) {
 			results = thermal_integration(s,n,dim,i,j,j+b_step,iterations,steps,gmcs);
-			fprintf(output, "%g\t%g\t%g\t%g\t%g\n", i,j,results[0], results[1], results[2]);
+			fprintf(output, "%g\t%g\t%g\n", i,j,results);
 			fflush(output);
-			free(results);
+		//	free(results);
 		}
 	}
 	fcloseall();

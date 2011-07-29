@@ -110,23 +110,23 @@ int main(int argc, char *argv[]) {
 	start_mag -= (14*14);
 	end_mag -= (14*14);
 	*/
-	/*
-	start_energy /= (14*14);
-	end_energy /= (14*14);
-	bin_size /= (14*14);
-	start_mag /= (14*14);
-	end_mag /= (14*14);
-	mag_step /= (14*14);
+	
+	start_energy /= (12*12);
+	end_energy /= (12*12);
+	bin_size /= (12*12);
+	start_mag /= (12*12);
+	end_mag /= (12*12);
+	mag_step /= (12*12);
+	
+	
+	/*	
+	start_energy /= (n*n); // *12);
+	end_energy /= (n*n); // *12);
+	bin_size /= (n*n); // *12);
+	start_mag /= (n*n); // *12);
+	end_mag /= (n*n); // *12);
+	mag_step /= (n*n); // *12);
 	*/
-	
-		
-	start_energy /= (12*12); // *12);
-	end_energy /= (12*12); // *12);
-	bin_size /= (12*12); // *12);
-	start_mag /= (12*12); // *12);
-	end_mag /= (12*12); // *12);
-	mag_step /= (12*12); // *12);
-	
 	
 	
 	fclose(snap);
@@ -160,8 +160,8 @@ int main(int argc, char *argv[]) {
 	
 	/* Free energy */
 	i =0;
-	for(i =0; i< 120; i +=10) {
-		for (temp1 = 0.05; temp1 < 0.5; temp1 += 0.025) {
+	for(i =0; i< 120; i +=5) {
+		for (temp1 = 0.05; temp1 < 0.1; temp1 += 0.025) {
 			temp3 =0;
 			sprintf(buffer, "T%06.3lf-B%06.3lf", temp1, (double)i*0.1);
 			FL = fopen(buffer, "w");
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
 //							hold = (start_energy2+k*bin_size);
 							hold = (start_mag+j*mag_step);
 						}
-						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy2+k*bin_size),(start_mag+j*mag_step),-0.1*i*(start_mag+j*mag_step)-temp1*work[ai(j,k,0,n_bins)]); // -(start_mag+j*mag_step)*0.1*i
+						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy2+k*bin_size),(start_mag+j*mag_step),(start_energy2+k*bin_size)-temp1*work[ai(j,k,0,n_bins)]); // -(start_mag+j*mag_step)*0.1*i
 						H = (start_energy2+k*bin_size);
 						
 						
@@ -211,7 +211,7 @@ int main(int argc, char *argv[]) {
 						E += (H) *exp( -(H)/temp1 );
 						E2 += pow(H,2) *exp(-(H)/temp1 );
 						M += (start_mag+j*mag_step) *exp( -(H)/temp1 );
-						M2 += pow(start_mag+j*mag_step,2) *exp( -(H)/temp1 );
+						M2 += pow(start_mag+j*mag_step,2) *exp( -(H)/temp1 ); 
 						
 					}
 					//if(isinf(temp3)) printf("Z gone to inf\n");

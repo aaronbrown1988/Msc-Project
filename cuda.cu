@@ -65,6 +65,21 @@ int main() {
 	}
 	cudaMemcpy(d_r, h_r, pow(n,dim)*sizeof(spintype), cudaMemcpyHostToDevice);
 	mykernel<<<512,512>>>(d_s, d_r, d_coupl, n, dim, 1.0);
+	for (i =0; i < 1024; i ++) {
+		h_r[i] = (float) rand()/RAND_MAX;
+	}
+	cudaMemcpy(d_r, h_r, pow(n,dim)*sizeof(spintype), cudaMemcpyHostToDevice);
+	mykernel<<<512,512>>>(d_s, d_r, d_coupl, n, dim, 1.0);
+	for (i =0; i < 1024; i ++) {
+		h_r[i] = (float) rand()/RAND_MAX;
+	}
+	cudaMemcpy(d_r, h_r, pow(n,dim)*sizeof(spintype), cudaMemcpyHostToDevice);
+	mykernel<<<512,512>>>(d_s, d_r, d_coupl, n, dim, 1.0);
+	for (i =0; i < 1024; i ++) {
+		h_r[i] = (float) rand()/RAND_MAX;
+	}
+	cudaMemcpy(d_r, h_r, pow(n,dim)*sizeof(spintype), cudaMemcpyHostToDevice);
+	mykernel<<<512,512>>>(d_s, d_r, d_coupl, n, dim, 1.0);
 		cudaMemcpy(d_r, h_r, pow(n,dim)*sizeof(spintype), cudaMemcpyHostToDevice);
 	cudaMemcpy(h_s, d_s, pow(n,dim)*sizeof(spintype), cudaMemcpyDeviceToHost);
 	printf("Got energy %lf\n ", energy_calc(h_s, n, dim, 0));

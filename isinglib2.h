@@ -66,7 +66,7 @@ void fprint_system(spintype *, int , int, char *);
 double swetnam_factor(int*, int,int, unsigned long int, double);
 int save_system(spintype *, int, int , char *);
 double * jarzinski(spintype *, int , int , double , double , double , int , int ,int, double);
-double * jar_eff(spintype *, int , int , double , double , double , int , int ,int, double);
+double * jar_eff(spintype *, int , int , double , double , double , long int ,  int ,int, double);
 spintype * load_system(char *);
 double stripe_order(spintype *, int , int);
 void fprint_map(spintype *, int , int, char *);

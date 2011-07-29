@@ -5,8 +5,8 @@
 int main(int argc, char *argv[]) {
 	spintype *s;
 	int n=12,dim=2;
-	int iterations;
-	int steps;
+	long int iterations;
+	long int steps;
 	double i,j,k;
 	double t_start, t_end,t_step;
 	double b_start, b_end, b_step;

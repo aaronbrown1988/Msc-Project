@@ -1442,7 +1442,7 @@ double * jarzinski(spintype *s, int n, int dim, double T, double B_start, double
 	return(results);
 }	
 
-double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_end, int runs, int steps, int done, double wall) {
+double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_end, long int runs, int steps, int done, double wall) {
 	int i,j,k,l;// generic loop variables
 	double *FW=NULL, *REV=NULL;
 	double ratio;
@@ -1542,10 +1542,17 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	for(j =done; j < runs; j++) {
 		/* Forward */
 		//Randomize spins
-		metropolis(fwd_start,n,dim, 10, T, &ratio, B_start);
+		done = 0;
+		while (done < 10) {
+			metropolis(fwd_start,n,dim, 50, T*100, &ratio, B_start);
+			done += 50*ratio;
+			DEBUGLINE fprintf(stderr, "De correlated by  %d\n", done);
+		}
+		metropolis(fwd_start,n,dim, 50, T, &ratio, B_start);
+		
 		memcpy(s,fwd_start, sizeof(spintype)*pow(n,dim));
 		t2 = clock();
-		if(((t2-t1)/CLOCKS_PER_SEC) > 0.95*wall) {
+		if(((t2-t1)/CLOCKS_PER_SEC) >= 0.90*wall) {
 			/*Out of time */
 			bin = fopen("FW.bin", "wb");
 			fwrite(FW, sizeof(double), runs, bin);
@@ -1553,7 +1560,7 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 			bin = fopen("REV.bin", "wb");
 			fwrite(REV, sizeof(double), runs, bin);
 			fclose(bin);
-			fprintf(stderr, "runs completed: %d\n Called with: n:%d dim:%d\nB: %lf - %lf\nruns:%d\nsteps: %d\ndone: %d\nwall: %lf\n", j,n,dim,B_start, B_end, runs,steps,done,wall);
+			fprintf(stderr, "runs completed: %d\n Called with: n:%d dim:%d\nB: %lf - %lf\nruns:%ld\nsteps: %d\ndone: %d\nwall: %lf\n", j,n,dim,B_start, B_end, runs,steps,done,wall);
 			exit(1);
 		}
 			
@@ -1563,7 +1570,7 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 			FW[j] += -sumover(s,n,dim)*B_step;
 			metropolis(s,n,dim,1,T,&ratio,B_start+i*B_step);
 			E[i] += energy_calc(s,n,dim,B_start+i*B_step);
-			M[i] += stripe_order(s,n,dim);//(sumover(s,n,dim)/pow(n,dim));
+			M[i] += (sumover(s,n,dim)/pow(n,dim)); // stripe_order(s,n,dim);//
 			k = (sumover(s,n,dim)/pow(n,dim)+1)/0.1;
 			l = (energy_calc(s,n,dim,B_start+i*B_step) - start_e)/e_step;
 			hist[l][k] ++;
@@ -1572,7 +1579,13 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 		}
 		//fclose(out);
 		/*Reverse */
-		metropolis(end_start,n,dim, 10, T, &ratio, B_end);
+		done = 0;
+		while (done < 10) {
+			metropolis(end_start,n,dim, 50, T*100, &ratio, B_end);
+			done += 50*ratio;
+			DEBUGLINE fprintf(stderr, "Reverse De correlated by  %d\n", done);
+		}
+		metropolis(end_start,n,dim, 50, T, &ratio, B_end);
 		memcpy(s,end_start, sizeof(spintype)*pow(n,dim));
 		
 		for (i =0; i <= steps; i++) {
@@ -1599,12 +1612,18 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 		E[steps+i+1] = E[steps+i+1]/runs;
 		
 		fprintf(out, "%d\t%g\t%g\t%g\n", i, M[i], E[i], B_start+i*B_step);
-		fprintf(outr, "%d\t%g\t%g\n", i, M[steps+i+1], E[steps+i+1]);
+		fprintf(outr, "%d\t%g\t%g\t%g\n", i, M[steps+i+1], E[steps+i+1], B_end-B_step*i);
 	}
 	fclose(outr);
 	fclose(out);
 	sprintf(buffer,"./Hist-%g-B%g-%g-fwd.tsv", T,B_start, B_end );
 	out = fopen(buffer, "w");
+	
+	bin = fopen("FW.bin", "wb");
+	fwrite(FW, sizeof(double), runs, bin);
+	fclose(bin);
+	bin = fopen("REV.bin", "wb");
+	fwrite(REV, sizeof(double), runs, bin);
 	
 	//printf("%d \n", e_bins);
 	for( i =0; i <e_bins; i ++) {
@@ -1626,19 +1645,25 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	
 	WF = WF/runs;
 	WR = WR/runs;
-	
+	fprintf(stderr, "WF: %lf WR: %lf\n", WF, WR);
 	dWf = 0;
 	dWr = 0;
 	for (j =0; j < runs; j++) {
 		dWf += pow(FW[j] - WF,2);
-		dWr += pow(REV[j] - WR,2);
+		dWr += pow(-REV[j] + WR,2);
+		if (isnan(dWf) || isnan(dWr)) {
+			fprintf(stderr, "dWr or dWf has become nan after element %d in Sum\n");
+		}
 	}
 	
 	dWf = sqrt(dWf/(runs *(runs-1)));
 	dWr = sqrt(dWr/(runs *(runs-1)));
 	
+	
 	dWf = dWf * sqrt(runs);
 	dWr = dWr * sqrt(runs);
+	
+	if (dWf == 0) fprintf(stderr, "runs = %ld sqrt = %lf\n", runs , sqrt(runs));
 	
 	sprintf(buffer, "out-curves-%g-%g.tsv",T,B_start);
 	out = fopen(buffer, "w");
@@ -1646,6 +1671,7 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 		P = exp(-pow(FW[i] - WF,2)/(2*dWf*dWf))/(sqrt(2*M_PI)*dWf);
 		fprintf(out, "%lf\t%lf", FW[i], P);
 		fflush(out);
+		DEBUGLINE if (isnan(P)) fprintf(stderr, " exp pow(%lf - %lf, 2)/ 2* %lf *%lf)/ sqrt (2*PI)*%lf = NaN\n", FW[i], WF, dWf,dWf,dWf);
 		P = exp(-pow(REV[i] - WR,2)/(2*dWr*dWr))/(sqrt(2*M_PI)*dWr);
 		fprintf(out, "\t%lf\t%lf\n", REV[i], P);
 		fflush(out);
@@ -1653,7 +1679,7 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	
 	
 	alpha = dWf/dWr;
-	dF = (WF - alpha*alpha *WR - sqrt( alpha *alpha*pow(WF - WR,2)-2*(1-alpha*alpha)*dWf*dWf*log(alpha)))/(1-alpha*alpha);
+	dF = (WF + alpha*alpha *WR - sqrt( alpha *alpha*pow(WF + WR,2)-2*(1-alpha*alpha)*dWf*dWf*log(alpha)))/(1-alpha*alpha);
 //	printf("dF: %g\n", dF);
 	results[0] = dF;
 	dF =0;
@@ -1664,11 +1690,12 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	results[1] = dF;
 	dF =0;
 	for(i=0; i < runs; i++) {
-		dF += exp(REV[i]/T);
+		dF += exp(+REV[i]/T);
 	}
 	dF = -T*log(dF/runs);
 	results[2] = dF;
 	fprintf(out, "#results[] = %g \t %g \t%g\n", results[0], results[1], results[2]);
+	fprintf(out, "#Wr %g Wf %g  dWr %g dWf %g\n", WR, WF, dWr, dWf);
 	fflush(out);
 	fcloseall();
 	free(FW);
@@ -1750,6 +1777,15 @@ double  thermal_integration(spintype *s, int n, int dim, double T, double B_star
 	double dH;
 	double dF;
 	double ratio;
+	int done;
+	spintype *fwd_start;
+	
+	fwd_start = malloc(pow(n,dim)*sizeof(spintype));
+	
+	initSpins(s,n,dim);
+	metropolis(s,n,dim, 1e5, T, &ratio, B_start);
+	memcpy(fwd_start, s, sizeof(spintype)*pow(n,dim));
+	
 	
 	M = malloc(sizeof(double)*steps);
 	if (M == NULL) {
@@ -1762,6 +1798,17 @@ double  thermal_integration(spintype *s, int n, int dim, double T, double B_star
 	
 	dH = (double)(B_end - B_start)/steps;
 	for (i =0; i < runs ; i ++) {
+		
+		done = 0;
+		while (done < 10) {
+			metropolis(fwd_start,n,dim, 50, T*100, &ratio, B_start);
+			done += 50*ratio;
+			DEBUGLINE fprintf(stderr, "De correlated by  %d\n", done);
+		}
+		metropolis(fwd_start,n,dim, 50, T, &ratio, B_start);
+		
+		memcpy(s,fwd_start, sizeof(spintype)*pow(n,dim));
+		
 		for (j =0; j < steps; j ++) {
 			metropolis(s,n,dim,gmcs,T,&ratio,(B_start+i*dH));
 			M[j] += sumover(s,n,dim)/pow(n,dim);
@@ -1786,7 +1833,9 @@ double stripe_order(spintype *s, int n, int dim) {
 		fprintf(stderr, "Non 2D systems not implemented yet :(\n");
 		return (-1);
 	}
-	
+	A = 0;
+	B = 0;
+	C=0;
 	for (i =0; i < n; i ++) {
 		for (j=0; j<n; j++) {
 			A += s[ai(i,j,0,n)].s * pow(-1,ai(i,j,0,n));
@@ -1798,7 +1847,7 @@ double stripe_order(spintype *s, int n, int dim) {
 	B = fabs(B/pow(n,dim));
 	C = fabs(C/pow(n,dim));
 	
-	return( (A<B)? (B<C)? B:C:(A<C)?C:A );
+	return( (A<B)? ((B<C)? C:B):((A<C)?C:A) );
 	
 }
 
