@@ -42,16 +42,13 @@ int main(int argc, char *argv[]) {
 	int i,j,k;
 	int n_bins;
 	double *dos;
-	double *work;
 	double E,E2,M,M2,denom;
-	double start_energy2, end_energy2,bin_size2 = 1;
 	double H;
 	double temp1,temp2,temp3;
 	char buffer[1000];
 	double gmin;
 	double gmax;
 	double hold;
-	int ebin, mbin, wbins;
 	start_energy = INT_MAX;
 	end_energy = -INT_MAX;
 	start_mag = INT_MAX;
@@ -161,57 +158,36 @@ int main(int argc, char *argv[]) {
 	/* Free energy */
 	i =0;
 	for(i =0; i< 120; i +=5) {
-		for (temp1 = 0.05; temp1 < 0.1; temp1 += 0.025) {
+		for (temp1 = 0.05; temp1 < 0.5; temp1 += 0.025) {
 			temp3 =0;
 			sprintf(buffer, "T%06.3lf-B%06.3lf", temp1, (double)i*0.1);
 			FL = fopen(buffer, "w");
 			hold = 1e99;
-			/* create new work array */
-			start_energy2 = start_energy - (i+1)*0.1;
-			end_energy2 = end_energy + (i+1)*0.1;
-			wbins = (end_energy2 -start_energy2)/bin_size;
-			if (i == 0 && start_energy2 > start_energy && wbins < n_bins) {
-				printf("start %g <  %g, end %g > %g, ||bins: %d > %d\n", start_energy, start_energy2, end_energy, end_energy2, n_bins, wbins);
-			//	exit(EXIT_FAILURE);
-			}
-				
-			work = malloc(n_bins*wbins*sizeof(double));
-			for(k=0; k < n_bins*wbins; k++) 
-				work[k] =0;
-//			printf("bin size: %g\n", bin_size2);
-			for (k =0; k < (n_bins-1); k++) {
-				for(j=0; j<(n_bins-1); j++) {
-					mbin = j;
-					ebin = (((start_energy+k*bin_size)-(start_mag+j*mag_step)*i*0.1)-start_energy2)/bin_size;
-					work[ai(mbin,ebin,0,n_bins)] += dos[ai(k,j,0,n_bins)];
-				}
-			}
-				
-	
+			
 
 		/* inverted loops such they run over mag then energy 6/4/11 */
 
 			for (j=0; j<n_bins; j++) {
-				for(k=0; k < wbins; k++) {
-					if(work[ai(j,k,0,n_bins)]  > 0) {
+				for(k=0; k < n_bins; k++) {
+					if(dos[ai(k,j,0,n_bins)]  > 0) {
 //						if ((start_energy2+k*bin_size) != hold) { - Taken out and swapped for line below in inverting loops
 						if ((start_mag+j*mag_step) != hold) {
 							fprintf(FL,"\n");
 //							hold = (start_energy2+k*bin_size);
 							hold = (start_mag+j*mag_step);
 						}
-						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy2+k*bin_size),(start_mag+j*mag_step),(start_energy2+k*bin_size)-temp1*work[ai(j,k,0,n_bins)]); // -(start_mag+j*mag_step)*0.1*i
-						H = (start_energy2+k*bin_size);
+						fprintf(FL, "%lf\t%lf\t%lf\n", (start_energy+k*bin_size),(start_mag+j*mag_step),(start_energy+k*bin_size)-temp1*dos[ai(k,j,0,n_bins)] - (start_mag+j*mag_step)*0.1*i); // -(start_mag+j*mag_step)*0.1*i
+						H = (start_energy+k*bin_size);
 						
 						
 						
 						
-						temp3 += exp( -(H)/temp1 );
+						temp3 += exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
 						//printf("%lf\t%lf\t%lf\t%lf\n", start_energy+k*bin_size, start_mag+j*mag_step, temp3, dos[ai(k,j,0,n_bins)]-gmax);
-						E += (H) *exp( -(H)/temp1 );
-						E2 += pow(H,2) *exp(-(H)/temp1 );
-						M += (start_mag+j*mag_step) *exp( -(H)/temp1 );
-						M2 += pow(start_mag+j*mag_step,2) *exp( -(H)/temp1 ); 
+						E += (H) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						E2 += pow(H,2) *exp(-(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						M += (start_mag+j*mag_step) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						M2 += pow(start_mag+j*mag_step,2) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1); 
 						
 					}
 					//if(isinf(temp3)) printf("Z gone to inf\n");
@@ -220,7 +196,6 @@ int main(int argc, char *argv[]) {
 				
 				
 			}
-			free(work);
 			fclose(FL);
 			if (temp3 ==0) {
 		//		printf("Z: %lf\n", temp3);
