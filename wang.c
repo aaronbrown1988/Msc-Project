@@ -35,16 +35,18 @@ int main(int argc, char * argv[]) {
 	//results = malloc(6*sizeof(double));
 	spintype *s;
 	
+	
+	//metropolis(s, n, dim, 1000, 1, &ratio, 0);
+	
+	if (argc >= 3) {
+		n  = atoi(argv[1]);
+		B = atof(argv[2]);
+	}
 	start_energy = -2*pow(n,dim);
 	s = malloc(pow(n,dim)*sizeof(spintype));
 	setupTriSystem(s,n, dim);	
 	initSpins(s,n,dim);
-	//metropolis(s, n, dim, 1000, 1, &ratio, 0);
-	
-	if (argc >= 2) 
-		B = atof(argv[1]);
-	
-	if (argc >= 3 ) {
+	if (argc >= 4 ) {
 		/* restarting */
 		fprintf(stderr,"Attempting to restart\n");
 		g_e = WL_import(argv[2], n,dim, B);

@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 	
 	/* Free energy */
 	i =0;
-	for(i =0; i< 120; i +=5) {
+	for(i =0; i< 120; i +=1) {
 		for (temp1 = 0.05; temp1 < 0.5; temp1 += 0.025) {
 			temp3 =0;
 			sprintf(buffer, "T%06.3lf-B%06.3lf", temp1, (double)i*0.1);
@@ -182,12 +182,12 @@ int main(int argc, char *argv[]) {
 						
 						
 						
-						temp3 += exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						temp3 += dos[ai(k,j,0,n_bins)]*exp( -(H)/temp1 )*exp(-i*0.1*(start_mag+j*mag_step)/temp1);
 						//printf("%lf\t%lf\t%lf\t%lf\n", start_energy+k*bin_size, start_mag+j*mag_step, temp3, dos[ai(k,j,0,n_bins)]-gmax);
-						E += (H) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
-						E2 += pow(H,2) *exp(-(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
-						M += (start_mag+j*mag_step) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
-						M2 += pow(start_mag+j*mag_step,2) *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1); 
+						E += (H)*dos[ai(k,j,0,n_bins)] *exp( -(H)/temp1 )*exp(-i*0.1*(start_mag+j*mag_step)/temp1);
+						E2 += pow(H,2)*dos[ai(k,j,0,n_bins)] *exp(-(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						M += (start_mag+j*mag_step)*dos[ai(k,j,0,n_bins)] *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1);
+						M2 += pow(start_mag+j*mag_step,2)*dos[ai(k,j,0,n_bins)] *exp( -(H)/temp1 )*exp(i*0.1*(start_mag+j*mag_step)/temp1); 
 						
 					}
 					//if(isinf(temp3)) printf("Z gone to inf\n");
