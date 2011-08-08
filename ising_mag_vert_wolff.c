@@ -17,7 +17,7 @@ int main(int argc, char * argv[]) {
 	char filename[80];
 	FILE *map;
 	FILE *input = NULL;
-	double coupl[4] = {1,1,1,1};
+	double coupl[4] = {1,1,1,-1};
 	double start_mag = 0;
 	double mag_step = 1;
 	double end_mag= 10;

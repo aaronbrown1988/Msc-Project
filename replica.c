@@ -101,19 +101,24 @@ int main(int argc, char * argv[]) {
 	
 	if (my_rank ==0) {
 		T_out =  malloc(sizeof(double) *(world_size*T_todo+GOOD_MEASURE));
-		for (i = 0; i < T_todo *world_size; i++)
-			T_out[i] = T_min + i * T_steps;
+		for(j=0; j<world_size;j++) {
+			for (i = 0; i < T_todo; i++) {
+				T_out[i+(j*T_todo)] = T_min + (world_size*i +j)* T_steps;
+			//	printf("%d = %lf\n",i+j*T_todo, T_out[i+j*T_todo]);
+			}
+		}
 	}	
 //	DEBUGLINE printf("Starting scatter\n", my_rank, j,T_curr);	
 	MPI_Scatter(T_out, T_todo, MPI_DOUBLE, Ts, T_todo, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 //	DEBUGLINE printf("%d, Finished Scatter\n has %d to do", my_rank ,T_todo);
-	
-	//DEBUGLINE printf("%d entering main loop\n", my_rank);
+//	for(i=0; i < T_todo; i++)
+//		printf("%d: %lf\n", my_rank, Ts[i]);
+//	//DEBUGLINE printf("%d entering main loop\n", my_rank);
 	for (l = 0; l < T_todo; l++) {
 		T_curr = Ts[l];
-		//DEBUGLINE printf("%d: Running Metroprolis at %lf\n", my_rank, T_curr);
+	//	printf("#%d: Running Metroprolis at %lf\n", my_rank, T_curr);
 		for ( j =0; j < SWAPS; j ++) {
-			//DEBUGLINE printf("%d: Running Metroprolis run %d at %lf\n", my_rank, j,T_curr);
+			//DEBUGLINE printf("#%d: Running Metroprolis run %d at %lf\n", my_rank, j,T_curr);
 			metropolis(s, n, dim, flips, T_curr, &ratio, 0);
 			for (k = 0; k < 2; k++) {
 				swap_attempts++;
@@ -203,7 +208,7 @@ int main(int argc, char * argv[]) {
 		DEBUGLINE printf("GATHERING Ts\n");
 		MPI_Gather(Ts, T_todo, MPI_DOUBLE, T_out, T_todo, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 		if (my_rank == 0) {
-			for(i =0; i < k; i++)
+			for(i =0; i < T_todo*world_size; i++)
 			printf("%lf\t%lf\n", T_out[i], E_out[i]);
 		}
 	
