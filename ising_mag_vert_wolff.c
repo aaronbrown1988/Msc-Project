@@ -23,6 +23,7 @@ int main(int argc, char * argv[]) {
 	double end_mag= 10;
 	int type = 2, spinmag = 1;
 	double tmp;
+	int a,b,c,d,e;
 	
 	input = fopen("input.dat", "r");
 
@@ -124,38 +125,26 @@ int main(int argc, char * argv[]) {
 //				if ((fabs((mags[H]/10)-tmp) < 0.01) || (k > 3)){
 					k=0;
 					printf("%lf\t%lf\t%lf\t%lf\n", B, mags[H]/10.0, fabs((mags[H]/10) - tmp), ratio);
-					//sprintf(filename, "map-%03d.tsv", H);
-					//map = fopen(filename, "w");
-		
-					
-					//for(i=0; i < n; i++) {
-						//for(j =0; j < n; j ++) {
-							//if(dim ==2) {
-								//fprintf(map, "%d\t%d\t%d\n", j,i,s[ai(j,i,0, n)].s);
-							//} else {
-								//tmp =0;
-								//for (l =0; l < n; l++) {
-									//tmp += s[ai(j,i,l,n)].s;
-								//}
-								//fprintf(map, "%d\t%d\t%lf\n",j,i,tmp);
-							//}
-						//} 
-						//fprintf(map, "\n");
-					//}
-					//fclose(map);
 					fflush(stdout);
-/*				}else {
-					printf("# not equilibriated %lf\t%lf\t%lf\t%lf\n", B, mags[H]/10.0, fabs((mags[H]/10) - tmp), ratio);
-					k++;
-					//Not equilibriated to my liking go again
-					i = 0;
-					mags[H] = 0;
-					
-				} */
 
 			}
+			e =0;
+			for(a=0; a < n; a++){
+			  for (b=0; b<n; b++) {
+			    d=0;
+			    for(c=0; c<n;c++) {
+			      d += s[ai(a,b,c,n)].s;
+			    }
+			    if (abs(d) < (n-1)){
+			      e++;
+			    }
+			  }
+			}
+			fprintf(stderr,"%g\t%d\n",B,e);
+			
 		}
 	}
+	
 	
 	printf("#B\tM\n");
 	
