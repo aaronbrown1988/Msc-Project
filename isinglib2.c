@@ -1450,6 +1450,7 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	double dWf, dWr;
 	double P,WR,WF;
 	double alpha, dF;
+	double Wf_min=INT_MAX, Wf_max=-INT_MAX, Wr_min=INT_MAX,Wr_max=-INT_MAX;
 	char buffer[1000];
 	int e_bins,m_bins;
 	double *M, *E;
@@ -1577,6 +1578,8 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 			sprintf(buffer, "./map-fwd-%07d-%07d.tsv", j,i);
 		//	fprint_map(s,n,dim,buffer);
 		}
+		Wf_min = (Wf_min < FW[j])? Wf_min: FW[j];
+		Wf_max = (Wf_max > FW[j])? Wf_max: FW[j];
 		//fclose(out);
 		/*Reverse */
 		done = 0;
@@ -1601,6 +1604,8 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 			sprintf(buffer, "./map-rev-%07d-%07d.tsv", j,i);
 			//	fprint_map(s,n,dim,buffer);
 		}
+		Wr_min = (Wr_min < REV[j])? Wr_min: REV[j];
+		Wr_max = (Wr_max > REV[j])? Wr_max: REV[j];
 		
 		
 	}
@@ -1668,12 +1673,12 @@ double *jar_eff(spintype *s, int n, int dim, double T, double B_start, double B_
 	sprintf(buffer, "out-curves-%g-%g.tsv",T,B_start);
 	out = fopen(buffer, "w");
 		for (i =0; i < runs; i ++) {
-		P = exp(-pow(FW[i] - WF,2)/(2*dWf*dWf))/(sqrt(2*M_PI)*dWf);
-		fprintf(out, "%lf\t%lf", FW[i], P);
+		P = exp(-pow(Wf_min+i*((Wf_max-Wf_min)/runs) - WF,2)/(2*dWf*dWf))/(sqrt(2*M_PI)*dWf);
+		fprintf(out, "%lf\t%lf", Wf_min+i*((Wf_max-Wf_min)/runs), P);
 		fflush(out);
 		DEBUGLINE if (isnan(P)) fprintf(stderr, " exp pow(%lf - %lf, 2)/ 2* %lf *%lf)/ sqrt (2*PI)*%lf = NaN\n", FW[i], WF, dWf,dWf,dWf);
-		P = exp(-pow(REV[i] - WR,2)/(2*dWr*dWr))/(sqrt(2*M_PI)*dWr);
-		fprintf(out, "\t%lf\t%lf\n", REV[i], P);
+		P = exp(-pow(Wr_min+i*((Wr_max-Wr_min)/runs) - WR,2)/(2*dWr*dWr))/(sqrt(2*M_PI)*dWr);
+		fprintf(out, "\t%lf\t%lf\n", Wr_min+i*((Wr_max-Wr_min)/runs), P);
 		fflush(out);
 	}
 	

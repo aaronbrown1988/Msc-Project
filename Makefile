@@ -25,6 +25,9 @@ gradient: gradient.o isinglib2.o
 ising_gen: isinglib2.o ising_gen.o
 	$(LD) -o $(BIN)/ising_gen ising_gen.o isinglib2.o $(LDFLAGS)
 
+correlation: isinglib2.o correlation.o
+	$(LD) -o $(BIN)/correlation correlation.o isinglib2.o $(LDFLAGS)
+
 ising_dbg: isinglib2.o ising_dbg.o
 	$(LD) -o $(BIN)/ising_dbg ising_dbg.o isinglib2.o $(LDFLAGS)
 
@@ -42,6 +45,9 @@ wang_stripe: isinglib2.o wang_stripe.o
 
 jar_sweep: isinglib2.o jar_sweep.o
 	$(LD) -o $(BIN)/jar_sweep jar_sweep.o isinglib2.o $(LDFLAGS)
+	
+jar_process: isinglib2.o jar_process.o
+	$(LD) -o $(BIN)/jar_process jar_process.o isinglib2.o $(LDFLAGS)
 	
 ti: isinglib2.o ti.o
 	$(LD) -o $(BIN)/ti ti.o isinglib2.o $(LDFLAGS)

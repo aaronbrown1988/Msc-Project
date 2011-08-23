@@ -8,7 +8,7 @@
 #define SWAPS 			100
 #define GOOD_MEASURE 	10
 #define DEBUG 			0
-#define ENERGY 			333
+#define ENERGY 			999
 #define SWAP 			444
 #define DEBUGLINE		if(DEBUG==1)
 #define TEMP			777
@@ -32,6 +32,7 @@ int main(int argc, char * argv[]) {
 	int flips;
 	int swap_attempts, swap_success;
 	double *Es ,*Ts, *E_out, *T_out;
+	double *Rs, *R_out;
 	double e_recv, e_mine;
 	double T_max, T_min, T_steps, T_curr, t_recv;
 	spintype *s;
@@ -93,6 +94,7 @@ int main(int argc, char * argv[]) {
 	
 	Es = malloc(sizeof(double)*T_todo);
 	Ts = malloc(sizeof(double)*T_todo);
+	Rs = malloc(sizeof(double)*T_todo);
 	
 	if (!Es || !Ts) {
 		printf("Didn't get enough memory");
@@ -104,7 +106,7 @@ int main(int argc, char * argv[]) {
 		for(j=0; j<world_size;j++) {
 			for (i = 0; i < T_todo; i++) {
 				T_out[i+(j*T_todo)] = T_min + (world_size*i +j)* T_steps;
-			//	printf("%d = %lf\n",i+j*T_todo, T_out[i+j*T_todo]);
+			//	printf("#%d = %lf\n",i+j*T_todo, T_out[i+j*T_todo]);
 			}
 		}
 	}	
@@ -117,23 +119,25 @@ int main(int argc, char * argv[]) {
 	for (l = 0; l < T_todo; l++) {
 		T_curr = Ts[l];
 	//	printf("#%d: Running Metroprolis at %lf\n", my_rank, T_curr);
+		swap_success=0;
+		swap_attempts=0;
 		for ( j =0; j < SWAPS; j ++) {
 			//DEBUGLINE printf("#%d: Running Metroprolis run %d at %lf\n", my_rank, j,T_curr);
 			metropolis(s, n, dim, flips, T_curr, &ratio, 0);
 			for (k = 0; k < 2; k++) {
-				swap_attempts++;
+				
 				/* Prepare spins for transport */
 				for (i =0; i <pow(n,dim); i++) 
 						spin_out[i] = s[i].s;
-				dest = my_rank+1;
-				recv =  my_rank -1;
+				dest = my_rank-1;
+				recv =  my_rank +1;
 		
 				e_mine = energy_calc(s,n,dim,0.0);
 				
-				if (my_rank %2 == k) {
+				if ((my_rank+1) %2 == k) {
 					
-					if(dest < world_size ) {
-						
+					if(dest >=0 ) {
+						swap_attempts++;
 					//	DEBUGLINE printf("%d: has energy %lf, Partner: %d\n", my_rank, e_mine,dest);
 						
 						
@@ -144,10 +148,10 @@ int main(int argc, char * argv[]) {
 					//	DEBUGLINE printf("%d: ....Parnter answered\n", my_rank);
 						r = rand();
 						r = (double)r/RAND_MAX;
-						if (r < exp(-1*(1/(kb*T_curr) - 1/(kb*t_recv))*(e_mine - e_recv))) {
+						if (r < exp((1/(kb*T_curr) - 1/(kb*t_recv))*(e_mine - e_recv))) {
 							swap_success++;
 							swap = 1;
-							DEBUGLINE printf("%d is at %lf has just swapped with %d  at %lf\n", my_rank, T_curr, dest, t_recv);
+							
 							MPI_Ssend(&swap, 1, MPI_INT, dest, SWAP, MPI_COMM_WORLD);
 						//	DEBUGLINE printf("%d: sending to %d\n", my_rank, dest);
 							
@@ -157,6 +161,7 @@ int main(int argc, char * argv[]) {
 							MPI_Recv(spin_in, pow(n,dim), MPI_INT, dest, LOW_T, MPI_COMM_WORLD, &status_info);
 						} else { 
 							swap = 0;
+							//DEBUGLINE printf("%d is at %lf has just rejected %d  at %lf\n", my_rank, T_curr, dest, t_recv);
 							MPI_Ssend(&swap, 1, MPI_INT, dest, SWAP, MPI_COMM_WORLD);
 						}
 						
@@ -164,7 +169,9 @@ int main(int argc, char * argv[]) {
 					
 					
 				} else {
-					if (recv >= 0) {
+					swap=0;
+					if (recv <world_size) {
+					  swap_attempts++;
 						MPI_Ssend(&T_curr, 1, MPI_DOUBLE, recv, TEMP, MPI_COMM_WORLD);
 			//			DEBUGLINE printf("%d: has energy %lf, Partner %d\n", my_rank, e_mine,recv);
 						MPI_Ssend(&e_mine, 1, MPI_DOUBLE, recv, ENERGY, MPI_COMM_WORLD);
@@ -174,6 +181,7 @@ int main(int argc, char * argv[]) {
 			//			DEBUGLINE printf("%d: ....Swap details recieved\n", my_rank);
 						if(swap == 1) {
 							swap_success++;
+							
 				//			DEBUGLINE printf("%d: Waiting for data from %d\n", my_rank, recv);
 							MPI_Recv(spin_in, pow(n,dim), MPI_INT, recv, HIGH_T, MPI_COMM_WORLD, &status_info);
 				//			DEBUGLINE printf("%d: Swapping\n", my_rank);
@@ -184,8 +192,11 @@ int main(int argc, char * argv[]) {
 						
 				}
 				/* Put new spins into our system */
-				for (i =0; i < pow(n,dim); i++)
-					s[i].s = spin_in[i];
+				if (swap==1) 
+				  {
+				  for (i =0; i < pow(n,dim); i++)
+				    s[i].s = spin_in[i];
+				  }
 				}
 				metropolis(s, n, dim, flips, T_curr, &ratio, 0);
 				
@@ -193,6 +204,12 @@ int main(int argc, char * argv[]) {
 		}
 		metropolis(s, n, dim, flips*10, T_curr, &ratio, 0);
 		Es[l] = energy_calc(s, n, dim, 0.0);
+		Rs[l] = (double) swap_success;
+		//Rs[l] = (double) (my_rank==1 || my_rank==2)? (swap_success/2.0):swap_success;
+		Rs[l] = (double) Rs[l]/swap_attempts;
+		if (Rs[l] ==1 ) {
+			printf("#%d: has swapped every time at %lf\n", my_rank, T_curr);
+		}
 	//	if (Es[l] == 0)
 		//	printf("%d: Zero energy\n", my_rank);
 		Ts[l] = T_curr;
@@ -200,16 +217,18 @@ int main(int argc, char * argv[]) {
 	//if (my_rank ==0) {
 			k = world_size*T_todo;
 			E_out = malloc(sizeof(double) *(world_size*T_todo+GOOD_MEASURE));
+			R_out = malloc(sizeof(double) *(world_size*T_todo+GOOD_MEASURE));
 			
 		//}
 		
-		DEBUGLINE printf("GATHERING Es\n");
+		DEBUGLINE printf("#GATHERING Es\n");
 		MPI_Gather(Es, T_todo, MPI_DOUBLE, E_out, T_todo, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		DEBUGLINE printf("GATHERING Ts\n");
+		DEBUGLINE printf("#GATHERING Ts\n");
 		MPI_Gather(Ts, T_todo, MPI_DOUBLE, T_out, T_todo, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(Rs, T_todo, MPI_DOUBLE, R_out, T_todo, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 		if (my_rank == 0) {
 			for(i =0; i < T_todo*world_size; i++)
-			printf("%lf\t%lf\n", T_out[i], E_out[i]);
+			printf("%lf\t%lf\t%lf\n", T_out[i], E_out[i], R_out[i]);
 		}
 	
 		printf("#%d: My ratio was: %lf\n", my_rank, (double)swap_success/swap_attempts);

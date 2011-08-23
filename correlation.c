@@ -76,7 +76,7 @@ int main(int argc, char * argv[]) {
 	      tau[m-1] += tmp;
 	      tauerr[m-1] += tmp*tmp;
 	  }
-	  fprintf(stderr, "Step %d, M=%g\tE=%g\tratio=%lf\n", l, sumover(s,n,dim)/pow(n,dim),energy_calc(s,n,dim,B),ratio);
+	  //  fprintf(stderr, "Step %d, M=%g\tE=%g\tratio=%lf\n", l, sumover(s,n,dim)/pow(n,dim),energy_calc(s,n,dim,B),ratio);
 	
   }
 
